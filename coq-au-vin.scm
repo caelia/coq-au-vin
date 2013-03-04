@@ -8,6 +8,7 @@
         (import scheme)
         (import chicken)
         (import files)
+        (import ports)
 
         (use lowdown)
         (use ersatz)
@@ -18,6 +19,61 @@
 
 (define (eprintf fmt . args)
   (error (apply sprintf (cons fmt args))))
+
+(define (strip-html str)
+  (let* ((in-tag #f)
+         (enter-tag
+           (lambda ()
+             (if in-tag
+               (set! in-tag (+ in-tag 1))
+               (set! in-tag 1))))
+         (leave-tag
+           (lambda ()
+             (cond
+               ((not in-tag) #f)
+               ((= in-tag 1) (set! in-tag #f))
+               (else (set! in-tag (- in-tag 1)))))))
+    (with-output-to-string
+      (lambda ()
+        (with-input-from-string
+          str
+          (lambda ()
+            (let loop ((c (read-char)))
+              (cond
+                ((eof-object? c)
+                 #f)
+                ((char=? c #\<)
+                 (enter-tag)
+                 (loop (read-char)))
+                ((char=? c #\>)
+                 (leave-tag)
+                 (loop (read-char)))
+                (in-tag
+                  (loop (read-char)))
+                (else
+                  (write-char c)
+                  (loop (read-char)))))))))))
+
+(define (escape-html str)
+  (with-output-to-string
+    (lambda ()
+      (with-input-from-string
+        str
+        (lambda ()
+          (let loop ((c (read-char)))
+            (cond
+              ((eof-object? c)
+               #f)
+              ((char=? c #\<)
+               (display "&lt;")
+               (loop (read-char)))
+              ((char=? c #\>)
+               (display "&gt;"))
+               (loop (read-char)))
+              (else
+                (write-char c)
+                (loop (read-char))))))))))
+
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
