@@ -12,6 +12,7 @@
 
         (use lowdown)
         (use ersatz)
+        (use srfi-69)
 
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
@@ -74,6 +75,12 @@
                 (write-char c)
                 (loop (read-char))))))))))
 
+(define (string->bool s)
+  (let ((s (string-downcase s)))
+    (cond
+      ((string=? s "true") #t)
+      ((string=? s "false") #t)
+      (eprintf "'~A' does not represent a boolean value.\n"))))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -86,8 +93,78 @@
 
 (define %default-teaser-length% (make-parameter 1024))
 
+(define %config% (make-parameter (make-hash-table)))
+
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
+
+;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+;;; ----  RUNTIME CONFIGURATION  -------------------------------------------
+
+(define (read-config-blog-data cfg params)
+  (let loop ((params params))
+    (if (null? params)
+      cfg
+      (let* ((param (car params))
+             (key (car param))
+             (val (cdr param)))
+        (case key
+          ((raw-html)
+           (hash-table-set! cfg key (string->symbol val)))
+          ((max-post-length max-comment-length teaser-length)
+           (hash-table-set! cfg key (string->number val)))
+          (else #f))
+        (loop (cdr params))))))
+
+(define (read-config-blog-interface cfg params)
+  (let loop ((params params))
+    (if (null? params)
+      cfg
+      (let* ((param (car params))
+             (key (car param))
+             (val (cdr param)))
+        (case key
+          ((use-javascipt inline-editing)
+           (hash-table-set! cfg key (string->bool val)))
+          (else #f))
+        (loop (cdr params))))))
+
+(define (read-config-blog-appearance cfg params)
+  (let loop ((params params))
+    (if (null? params)
+      cfg
+      (let* ((param (car params))
+             (key (car param))
+             (val (cdr param)))
+        (case key
+          ((layout theme)
+           (hash-table-set! cfg key val))
+          (else #f))
+        (loop (cdr params))))))
+
+(define (read-config-blog cfg params)
+  (let loop ((params params))
+    (if (null? params)
+      cfg
+      (let* ((param (car params))
+             (key (car param))
+             (val* (cdr param))
+             (process-value
+               (case key
+                 ((name home db engine) identity)
+                 ((data) (lambda (v) (read-config-blog-data (make-hash-table) v)))
+                 ((interface) (lambda (v) (read-config-blog-interface (make-hash-table) v)))
+                 ((appearance) (lambda (v) (read-config-blog-appearance (make-hash-table) v)))
+                 (else (lambda (_) '%INVALID%))))
+             (val (process-value val*)))
+        (unless (eqv? val '%INVALID%)
+          (hash-table-set! cfg key val))
+        (loop (cdr params))))))
+
+(define (read-config file)
+  (let ((config (%config%)))
+
+;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 (define (default-teaser article-body)
   (let ((alen (string-length article-body))
