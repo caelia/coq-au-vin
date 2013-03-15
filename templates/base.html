@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+  <head>
+    <title>{{ htmlTitle }}</title>
+    <script type="text/javascript" src="{{ jquerySrc }}"></script>
+    {% block pageScripts %}
+    {% endblock %}
+    {% block styleSheets %}
+    {% endblock %}
+  </head>
+  <body class="{% block bodyClass %}{% endblock %}">
+    <div id="header" >
+      {% block headerContent %}
+      {% endblock headerContent %}
+    </div>
+    <div id="mainRegion">
+      <div id="leftSide">
+        {% block leftSideContent %}
+        {% endblock leftSideContent %}
+      </div>
+      <div id="contentArea">
+        {% block mainContent %}
+        {% endblock mainContent %}
+      </div>
+      <div id="rightSide">
+        {% block rightSideContent %}
+        {% endblock rightSideContent %}
+      </div>
+    </div>
+    <div id="footer" >
+      {% block footerContent %}
+      {% endblock footerContent %}
+    </div>
+  </body>
+</html>
