@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<blog>
+  <name>coq-au-vin</name>
+  <!-- Home directory for this blog -->
+  <home>/srv/http/coq-au-vin.net</home>
+  <!-- Which database to use. Redis is the default, and currently the only supported option. -->
+  <db>redis</db>
+  <!-- How the application is to be run. -->
+  <engine>fastcgi</engine>
+  <data>
+    <!-- This option determines how raw HTML markup in Markdown content will be handled.
+         Possible values are 'escape' (the default), 'strip', and 'pass' (use at your own risk!). -->
+    <raw-html>escape</raw-html>
+    <!-- The following parameters determine the maximum lengths, in characters, of posts and comments,
+         and the default length of teasers (this last can be overridden on a per-post basis. -->
+    <max-post-length>16384</max-post-length>
+    <max-comment-length>1024</max-comment-length>
+    <teaser-length>1024</teaser-length>
+  </data>
+  <interface>
+    <!-- Enable or disable javascript for the entire site. A setting of 'false' here means
+         that javascript will not be available at all, and any capabilities that depend on
+         javascript will be disabled, regardless of their individual settings in this file. -->
+    <use-javascript>true</use-javascript>
+    <!-- If inline editing is enabled, wherever Javascript is available, the Edit button for
+         a post will replace the read-only page with an editing form containing the post content. -->
+    <inline-editing>true</inline-editing>
+  </interface>
+  <appearance>
+    <layout>default</layout>
+    <theme>default</theme>
+  </appearance>
+</blog>
