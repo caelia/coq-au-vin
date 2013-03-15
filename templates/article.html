@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block pageScripts %}
+  <script type="text/javascript">
+    var dirty = false;
+    var bodyMD = {{ bodyMD }};
+    var bodyDiv;
+    var bodyHTML;
+    var canEdit = {{ canEdit }};
+  
+    function showEditButton() {
+    }
+    
+    function beginEditing() {
+      bodyDiv.empty();
+    }
+  
+    function discardChanges() {
+    }
+
+    function previewChanges() {
+    }
+
+    function submitChanges() {
+    }
+
+    function setupForAJAX() {
+      $("#beginEditForm").removeAttr("action");
+      $("#beginEditForm").removeAttr("method");
+    }
+
+    $(document).ready(function () {
+      bodyDiv = $("#articleBody");
+      bodyHTML = bodyDiv.html();
+      if (canEdit) {
+        showEditButton();
+      }
+    });
+  </script>
+{% endblock %}
+
+{% block bodyClass %}SingleArticle{% endblock %}
+
+{% block headerContent %}
+  <h1>S I N G L E   A R T I C L E   P A G E</h1>
+{% endblock %}
+
+{% block leftSideContent %}
+  <em>Left</em>
+{% endblock %}
+
+{% block mainContent %}
+  {% if seriesTitle %}
+    <h4 id="seriesTitle">{{ seriesTitle }}{% if partNo %}, Part {{ partNo }}{% endif %}</h4>
+  {% endif %}
+  <h3 id="articleTitle"></h3>
+  {% if subTitle %}
+    <h5 id="articleSubTitle">{{ articleSubTitle }}</h5>
+  {% endif %}
+  <div id="articleBody">
+    {{ articleBody }}
+  </div>
+  <form id="beginEditForm" action="{{ urlScheme }}://{{ hostName }}/content/{{ articleID }}/edit" method="POST">
+    <input id="returnTo" name="returnTo" type="hidden" value="{{ currentPath }}" />
+    <button id="editButton" name="editButton" type="submit">Edit</button>
+  </form>
+{% endblock %}
+
+{% block rightSideContent %}
+  <em>Right</em>
+{% endblock %}
+
+{% block footerContent %}
+  <p class="copyrightNotice">
+    Copyright © {{ copyrightYear }} by {{ authorName }}. {{ rightsStatement }}.
+  </p>
+{% endblock %}
