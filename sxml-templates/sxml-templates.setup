@@ -1,0 +1,7 @@
+;;; -*- Hen -*-
+(include "setup-helper")
+(verify-extension-name "sxml-templates")
+(setup-shared-extension-module
+ 'sxml-templates
+ (extension-version 0.2))
+
