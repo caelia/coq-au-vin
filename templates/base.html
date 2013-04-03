@@ -2,37 +2,36 @@
 <!DOCTYPE html
   PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<html
+    xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:cvt="http://xmlns.therebetygers.net/civet/0.1"
+    xml:lang="en" lang="en">
   <head>
-    <title>{{ htmlTitle }}</title>
-    <script type="text/javascript" src="{{ jquerySrc }}"></script>
-    {% block pageScripts %}
-    {% endblock %}
-    {% block styleSheets %}
-    {% endblock %}
+    <title><cvt:var name="htmlTitle"/></title>
+    <script type="text/javascript" cvt:src="jquerySrc"></script>
+    <cvt:block name="pageScripts"/>
+    <cvt:block name="styleSheets"/>
   </head>
-  <body class="{% block bodyClass %}{% endblock %}">
-    <div id="header" >
-      {% block headerContent %}
-      {% endblock headerContent %}
+  <body> 
+    <cvt:attr name="class">
+      <cvt:var name="bodyClasses"/>
+    </cvt:attr>
+    <div id="header">
+      <cvt:block name="headerContent"/>
     </div>
     <div id="mainRegion">
       <div id="leftSide">
-        {% block leftSideContent %}
-        {% endblock leftSideContent %}
+        <cvt:block name="leftSideContent"/>
       </div>
       <div id="contentArea">
-        {% block mainContent %}
-        {% endblock mainContent %}
+        <cvt:block name="mainContent"/>
       </div>
       <div id="rightSide">
-        {% block rightSideContent %}
-        {% endblock rightSideContent %}
+        <cvt:block name="rightSideContent"/>
       </div>
     </div>
-    <div id="footer" >
-      {% block footerContent %}
-      {% endblock footerContent %}
+    <div id="footer">
+      <cvt:block name="footerContent"/>
     </div>
   </body>
 </html>
