@@ -362,3 +362,39 @@
                 (lambda (tag) (exec st id tag))
                 tags)))
           tag-sets-renumbered)))))
+
+(define (fix-article-datum ad)
+  (let ((key (car ad))
+        (value (cdr ad)))
+    (cond
+      ((string=? key "timestamp")
+       (cons key (sprintf "n~A" (time->seconds (date->time value)))))
+      ((string=? key "tags")
+       (cons key (string-append "S" (anon-hex-string value))))
+      (else
+        (cons key (string-append "=" value))))))
+
+(define fixed-articles
+  (map
+    (lambda (art)
+      (let ((id (car art))
+            (data (cdr art)))
+        (cons id (map fix-article-datum data))))
+    articles))
+
+(define (store-articles)
+  (call-with-database
+    "examples/demo-site1/data/preloaded.db"
+    (lambda (db)
+      (let ((st (sql db "INSERT INTO statements (s, p, o) VALUES (?, ?, ?);")))
+        (for-each
+          (lambda (art)
+            (let ((id (car art))
+                  (props (cdr art)))
+              (for-each
+                (lambda (p)
+                  (let ((k (car p))
+                        (v (cdr p)))
+                    (exec st id k v)))
+                props)))
+          fixed-articles)))))
