@@ -13,7 +13,7 @@
         (use sql-de-lite)
         (use srfi-19)
 
-(define current-db (make-parameter #f))
+(define current-connection (make-parameter #f))
 
 (define first-id (make-parameter (lambda (_) 0)))
 
@@ -53,7 +53,8 @@ CREATE TABLE users (
     passhash TEXT NOT NULL,
     email TEXT NOT NULL,
     role INTEGER REFERENCES roles(id) NOT NULL,
-    display_name TEXT
+    display_name TEXT,
+    blocked_until INTEGER
 );
 SQL
 
@@ -112,6 +113,14 @@ CREATE TABLE sessions (
     expires INTEGER NOT NULL
 );
 SQL
+
+#<<SQL
+CREATE TABLE bad_logins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user INTEGER REFERENCES users(id) NOT NULL,
+    time INTEGER NOT NULL
+);
+SQL
 ))
 
 ;;; ========================================================================
@@ -136,16 +145,63 @@ SQL
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  USERS, ROLES, AUTHENTICATION, & SESSIONS  ------------------------
 
-;;; ========================================================================
-;;; ------------------------------------------------------------------------
+;;; ------  SQL Queries  ---------------------------------------------------
 
 (define add-role-query
   "INSERT INTO roles (name) VALUES (?);")
 
+(define delete-role-query
+  "DELETE FROM roles WHERE name = ?;")
+
 (define add-user-query
   "INSERT INTO users (uname, passhash, email, role, display_name) 
-      SELECT ?, ?, ?, roles(id), ?
-      WHERE roles(name) = ?;")
+      SELECT ?, ?, ?, id, ?
+      FROM roles
+      WHERE name = ?;")
+
+(define user-exists-query
+  "SELECT id FROM users WHERE uname = ?;")
+
+(define get-user-info-query
+  "SELECT email, role, display_name FROM users WHERE uname = ?;")
+
+(define get-user-role-query
+  "SELECT role FROM users WHERE uname = ?;")
+
+(define update-password-query
+  "UPDATE users SET passhash = ? WHERE uname = ?;")
+
+(define update-user-info-query
+  "UPDATE users SET email = ?, role = ?, display_name = ? WHERE uname = ?;")
+
+(define delete-user-query
+  "DELETE FROM users WHERE uname = ?;")
+
+(define user-blocked-query
+  "SELECT id FROM users WHERE uname = ? AND blocked_until > ?;")
+
+(define get-passhash-query
+  "SELECT passhash FROM users WHERE uname = ?;")
+
+(define bad-login-count-query
+  "SELECT count(id)
+      FROM bad_logins
+      WHERE user = users(id)
+      AND users(uname) = ?;")
+
+(define add-bad-login-query
+  "INSERT INTO bad_logins (user, time)
+      SELECT id, ?
+      FROM users
+      WHERE users(uname) = '?';")
+
+(define clear-bad-logins-query
+  "DELETE FROM bad_logins
+      WHERE user = users(id) AND users(uname) = ?;")
+
+(define block-user-query
+  "UPDATE users SET blocked_until = ?
+      WHERE uname = ?;")
 
 (define add-session-query
   "INSERT INTO sessions (key, user, expires)
@@ -163,6 +219,108 @@ SQL
 
 (define delete-session-query
   "DELETE FROM sessions WHERE key = ?;")
+
+;;; ========================================================================
+;;; ------  Functions  -----------------------------------------------------
+
+(define (add-role role-name)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn add-role-query)))
+    (exec st role-name)))
+
+(define (delete-role role-name)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn delete-role-query)))
+    (exec st role-name)))
+
+(define (add-user uname phash email role #!optional (disp-name '()))
+  (let* ((conn (current-connection))
+         (st (sql/transient conn add-user-query)))
+    (exec st uname phash email disp-name role)))
+
+(define (user-exists? uname)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn user-exists-query)))
+    (query fetch-value st uname)))
+
+(define (get-user-info uname)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn get-user-info-query)))
+    (query fetch-alist st uname)))
+
+(define (get-user-role uname)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn get-user-role-query)))
+    (query fetch-value st uname)))
+
+(define (update-password uname phash)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn update-password-query)))
+    (exec st phash uname)))
+
+(define (update-user-info uname email role #!optional (disp-name '()))
+  (let* ((conn (current-connection))
+         (st (sql/transient conn update-user-info-query)))
+    (exec st email role disp-name uname)))
+
+(define (delete-user uname)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn delete-user-query)))
+    (exec st uname)))
+
+(define (can-login? uname)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn user-blocked-query)))
+    (not (query fetch-value st uname (current-seconds)))))
+
+(define (get-passhash uname)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn user-blocked-query)))
+    (query fetch-value st)))
+
+(define (bad-login uname)
+  (let* ((conn (current-connection))
+         (s-count (sql/transient conn bad-login-count-query))
+         (s-add (sql/transient conn add-bad-login-query))
+         (s-clear (sql/transient conn clear-bad-logins-query))
+         (s-block (sql/transient conn block-user-query)))
+    (let ((count (query fetch-value s-count)))
+      (printf "bad login count: ~A\n" count)
+      (if (and count (> count 1))
+        (begin
+          (exec s-clear uname)
+          (exec s-block (+ current-seconds 120) uname))
+        (exec s-add (current-seconds) uname)))))
+
+(define (clear-bad-logins uname)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn clear-bad-logins-query)))
+    (exec st uname)))
+
+(define (add-session key uname expires)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn add-session-query)))
+    (exec st key expires uname)))
+
+(define (refresh-session key expires)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn refresh-session-query)))
+    (exec st expires key)))
+
+(define (session-valid? key)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn session-valid-query)))
+    (query fetch-value st key (current-seconds))))
+
+(define (session-exists? key)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn session-exists-query)))
+    (query fetch-value st key)))
+
+(define (delete-session key)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn delete-session-query)))
+    (exec st key)))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
