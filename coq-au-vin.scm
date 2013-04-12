@@ -3,17 +3,21 @@
 ;;;   This program is open-source software, released under the
 ;;;   BSD license. See the accompanying LICENSE file for details.
 
-(module coq-au-vin
-        *
-        (import scheme)
-        (import chicken)
-        (import files)
-        (import ports)
+(import scheme)
+(import chicken)
+(import files)
+(import ports)
 
-        (use lowdown)
-        (use ersatz)
-        (use srfi-69)
+(use lowdown)
+(use civet)
+(use srfi-69)
+; (use crypt)
+;; FIXME: Need a better password hash!
+(use simple-sha1)
 
+;; temporary
+(load "cav-db.so")
+(import (prefix cav-db db:))
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  UTILITY FUNCTIONS  -----------------------------------------------
@@ -73,7 +77,7 @@
                (loop (read-char)))
               (else
                 (write-char c)
-                (loop (read-char))))))))))
+                (loop (read-char)))))))))
 
 (define (string->bool s)
   (let ((s (string-downcase s)))
@@ -94,6 +98,8 @@
 (define %default-teaser-length% (make-parameter 1024))
 
 (define %config% (make-parameter (make-hash-table)))
+
+(define %session-timeout% (make-parameter 900))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -164,8 +170,35 @@
 
 (define (read-config file)
   (let ((config (%config%)))
+    #f))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+
+
+
+;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+;;; ----  USERS, SESSIONS, AUTHENTICATION  ---------------------------------
+
+(define (register-user uname password email role #!optional (disp-name '()))
+  (let ((phash (string->sha1sum password)))
+    (unless (member role '("editor" "author" "member"))
+      (error (string-append "'" role "' is not a recognized role.")))
+    (call-with-database
+      (make-pathname (make-pathname (%blog-root%) "data") "example.db")
+      (lambda (conn)
+        (db:current-connection conn)
+        (db:add-user uname phash email role disp-name))))) 
+
+(define (login uname password)
+  (call-with-database
+    (make-pathname (make-pathname (%blog-root%) "data") "example.db")
+    (lambda (conn)
+      (db:current-connection conn)
+
+;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+
+;;; ========================================================================
+;;; ------------------------------------------------------------------------
 
 (define (default-teaser article-body)
   (let ((alen (string-length article-body))
@@ -198,9 +231,15 @@
     (index-ref 'post-order 10)))
 
 (define (init blog-root)
-  (%blog-root% blog-root))
+  (%blog-root% blog-root)
+  (call-with-database
+    (make-pathname (make-pathname blog-root "data") "example.db")
+    (lambda (conn)
+      (db:current-connection conn)
+      (for-each
+        db:add-role
+        '("admin" "editor" "author" "member" "guest")))))
 
-) ; END MODULE
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ------------------------------------------------------------------------
