@@ -16,37 +16,6 @@
 
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
-;;; ------------------------------------------------------------------------
-
-(define schemas
-  '((file-ref . string)
-    (date . number)
-    (time . number)
-    (article . ((series string #f)
-                (title string #t)
-                (subtitle string #f)
-                (author string #t)
-                (content file-ref #t)
-                (categories set #f)
-                (tags set #f)
-                (posted-date date #t)
-                (posted-time time #t)
-                (modified-date date #f)
-                (modified-time time #f)
-                (version string #t)
-                (languages (set string) #f)
-                (comments list #f)))
-    (user . ((uname string #t)
-             (email string #t)
-             (passhash string #t)
-             (display-name string #f)
-             (role symbol #t)))))
-
-;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
-
-
-
-;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  UTILITY FUNCTIONS  -----------------------------------------------
 
 (define (eprintf fmt . args)
@@ -127,6 +96,7 @@
 (define %config% (make-parameter (make-hash-table)))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+
 
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
