@@ -69,15 +69,28 @@ SQL
 #<<SQL
 CREATE TABLE articles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id TEXT NOT NULL UNIQUE,
     title TEXT NOT NULL,
     series INTEGER REFERENCES series(id),
     series_pt INTEGER,
     subtitle TEXT,
-    content TEXT NOT NULL,
     created_dt INTEGER NOT NULL,
     modified_dt INTEGER,
     version TEXT,
-    teaser_len INTEGER
+    teaser_len INTEGER,
+    alias TEXT
+);
+SQL
+
+#<<SQL
+CREATE TABLE comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id TEXT NOT NULL UNIQUE,
+    article INTEGER REFERENCES articles(id) NOT NULL,
+    author INTEGER REFERENCES users(id) NOT NULL,
+    created_dt INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    parent INTEGER
 );
 SQL
     
@@ -101,7 +114,7 @@ SQL
 CREATE TABLE articles_x_categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     article INTEGER REFERENCES articles(id) NOT NULL,
-    tag INTEGER REFERENCES categories(id) NOT NULL 
+    category INTEGER REFERENCES categories(id) NOT NULL 
 );
 SQL
 
@@ -324,8 +337,229 @@ SQL
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
+
+
+;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+;;; ----  CREATING & EDITING CONTENT  --------------------------------------
+
+;;; ------  SQL Queries  ---------------------------------------------------
+
+(define create-article-query
+#<<SQL
+INSERT INTO articles (node_id, title, series, series_pt, subtitle, created_dt, teaser_len, alias)
+  SELECT ?, ?, ?, ?, ?, strftime('%s', 'now', 'localtime'), ?, ?;
+SQL
+)
+
+(define add-article-author-query
+#<<SQL
+INSERT INTO articles_x_authors (article, author)
+  SELECT articles.id, authors.id
+  FROM articles, authors
+  WHERE articles(node_id) = ? AND users(uname) = ?;
+SQL
+)
+
+(define add-article-tag-query
+#<<SQL
+INSERT INTO articles_x_tags (article, tag)
+  SELECT articles.id, tags.id
+  FROM articles, tags
+  WHERE articles(node_id) = ? AND tags(tag) = ?;
+SQL
+)
+
+(define add-article-category-query
+#<<SQL
+INSERT INTO articles_x_categories (article, category)
+  SELECT articles.id, categories.id
+  FROM articles, categories
+  WHERE articles(node_id) = ? AND categories(category) = ?;
+SQL
+)
+
+(define get-article-query
+#<<SQL
+SELECT title, series, series_pt, subtitle, created_dt, teaser_len, alias
+FROM articles
+WHERE node_id = ?;
+SQL
+)
+
+(define get-article-authors-query
+#<<SQL
+SELECT uname, display_name
+FROM users
+WHERE users(id) = articles_x_authors(author)
+AND articles_x_authors(article) = articles(id)
+AND articles(node_id) = ?;
+SQL
+)
+
+(define get-article-tags-query
+#<<SQL
+SELECT tag FROM tags
+WHERE tags(id) = articles_x_tags(tag)
+AND articles_x_tags(article) = articles(id)
+AND articles(node_id) = ?;
+SQL
+)
+
+(define get-article-categories-query
+#<<SQL
+SELECT category FROM categories
+WHERE categories(id) = articles_x_categories(category)
+AND articles_x_categories(article) = articles(id)
+AND articles(node_id) = ?;
+SQL
+)
+
+(define update-article-query
+#<<SQL
+UPDATE articles
+SET title = ?, series = ?, series_pt = ?, subtitle = ?, teaser_len = ?, alias = ?
+WHERE node_id = ?;
+SQL
+)
+
+(define delete-article-query
+#<<SQL
+DELETE FROM articles WHERE node_id = ?;
+SQL
+)
+
+(define delete-article-author-query
+#<<SQL
+DELETE FROM articles_x_authors
+WHERE article = articles(id) AND articles(id) = ?;
+SQL
+)
+
+(define delete-article-tag-query
+#<<SQL
+DELETE FROM articles_x_tag
+WHERE article = articles(id) AND articles(id) = ?;
+SQL
+)
+
+(define delete-article-category-query
+#<<SQL
+DELETE FROM articles_x_categories
+WHERE article = articles(id) AND articles(id) = ?;
+SQL
+)
+
+(define add-comment-query
+#<<SQL
+INSERT INTO comments (node-id, article, author, created_dt, text, parent)
+SELECT ?, articles(id), authors(id), strftime('%s', 'now', 'localtime'), ?, ?
+WHERE articles(node_id) = ? AND users(uname) = ?;
+SQL
+)
+
+(define comment-parent-query
+  "SELECT parent FROM comments WHERE node_id = ?;")
+
+(define comment-children-query
+  "SELECT node_id FROM comments WHERE parent = ?;")
+
+(define delete-comment-query 
+  "DELETE FROM comments WHERE node_id = ?;")
+
+(define nullify-comment-query 
+#<<SQL
+UPDATE comments
+SET author = 'nobody', text = 'This comment has been deleted'
+WHERE node_id = ?;
+SQL
+)
+
 ;;; ========================================================================
-;;; ------------------------------------------------------------------------
+;;; ------  Functions  -----------------------------------------------------
+
+(define (create-article node-id title author/s
+                        #!key (series '()) (series-pt '()) (subtitle '())
+                        (teaser-len '()) (alias '()) (tags '()) (categories '()))
+  (let* ((authors (if (list? author/s) author/s (list author/s)))
+         (conn (current-connection))
+         (st-art (sql/transient conn create-article-query))
+         (st-auth (sql conn add-article-author-query))
+         (st-tag (sql conn add-article-tag-query))
+         (st-cat (sql conn add-article-category-query)))
+    (exec st-art node-id title series series-pt subtitle teaser-len alias)
+    (for-each
+      (lambda (auth) (exec st-auth node-id auth))
+      authors)
+    (for-each
+      (lambda (tag) (exec st-tag node-id tag))
+      tags)
+    (for-each
+      (lambda (cat) (exec st-cat node-id cat))
+      categories)))
+
+(define (update-article node-id #!key (series '()) (series-pt '()) (subtitle '())
+                        (teaser-len '()) (alias '()) (tags '()) (categories '()))
+  (let* ((conn (current-connection))
+         (st-art (sql/transient conn update-article-query))
+         (st-tag (sql conn add-article-tag-query))
+         (st-cat (sql conn add-article-category-query)))
+    (exec st-art title series series-pt subtitle teaser-len alias node-id)
+    (for-each
+      (lambda (tag) (exec st-tag node-id tag))
+      tags)
+    (for-each
+      (lambda (cat) (exec st-cat node-id cat))
+      categories)))
+
+(define (delete-article node-id)
+  (let* ((conn (current-connection))
+         (st-art (sql/transient conn delete-article-query))
+         (st-auth (sql conn delete-article-author-query))
+         (st-tag (sql conn delete-article-tag-query))
+         (st-cat (sql conn delete-article-category-query)))
+    (for-each
+      (lambda (st) (exec st node-id))
+      `(,st-art ,st-auth ,st-tag ,st-cat))))
+
+(define (add-comment node-id article author text #!optional (parent #f))
+  (let* ((conn (current-connection))
+         (st (sql/transient conn add-comment-query)))
+    (exec st text parent article author)))
+
+(define (comment-has-children? node-id)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn comment-children-query)))
+    (query fetch-value st node-id)))
+
+(define (delete-comment node-id)
+  (let* ((conn (current-connection))
+         (st-children? (sql/transient conn comment-children-query))
+         (st-nullify (sql/transient conn nullify-comment-query))
+         (st-delete (sql/transient conn delete-comment-query))
+         (has-children (query fetch-value st-children? node-id)))
+    (if has-children
+      (exec st-nullify node-id)
+      (exec st-delete node-id))))
+
+(define (delete-tree node-id st-children st-parent st-delete)
+  (let ((children (query fetch-all st-children node-id))
+        (parent (query fetch-value st-parent node-id)))
+    (if (null? children)
+      (begin
+        (exec st-delete node-id)
+        (unless (null? parent)
+          (delete-tree parent st-children st-parent st-delete)))
+      (for-each
+        (lambda (child) (delete-tree child st-children st-parent st-delete))
+        children))))
+
+(define (delete-thread node-id)
+  (let* ((conn (current-connection))
+         (st-children (sql conn comment-children-query))
+         (st-parent (sql conn comment-parent-query))
+         (st-delete (sql conn delete-comment-query)))
+    (delete-tree node-id st-children st-parent st-delete)))
+
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
