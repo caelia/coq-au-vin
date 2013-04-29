@@ -457,6 +457,17 @@ WHERE articles(node_id) = ? AND users(uname) = ?;
 SQL
 )
 
+(define get-article-comment-ids-query
+#<<SQL
+SELECT node_id FROM comments
+WHERE article = articles(id) AND articles(node_id) = ?
+AND parent = NULL;
+SQL
+)
+
+(define get-comment-query
+  "SELECT author, created_dt, text WHERE node_id = ?;")
+
 (define comment-parent-query
   "SELECT parent FROM comments WHERE node_id = ?;")
 
@@ -497,7 +508,7 @@ SQL
       (lambda (cat) (exec st-cat node-id cat))
       categories)))
 
-(define (update-article node-id #!key (series '()) (series-pt '()) (subtitle '())
+(define (update-article node-id #!key (title '()) (series '()) (series-pt '()) (subtitle '())
                         (teaser-len '()) (alias '()) (tags '()) (categories '()))
   (let* ((conn (current-connection))
          (st-art (sql/transient conn update-article-query))
@@ -525,6 +536,22 @@ SQL
   (let* ((conn (current-connection))
          (st (sql/transient conn add-comment-query)))
     (exec st text parent article author)))
+
+(define (get-article-comment-ids node-id)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn get-article-comment-ids-query)))
+    (query fetch-all st node-id)))
+
+(define (get-comment-thread node-id #!optional (depth #f))
+  (let* ((conn (current-connection))
+         (st-kids (sql conn add-comment-query))
+         (st-content (sql conn get-comment-query)))
+    (let loop ((id node-id))
+      (let* ((content (query fetch-alist st-content id))
+             (kid-ids (query fetch-all st-kids id)))
+        (if (null? kid-ids)
+          content
+          (append content `(children . ,(map loop kid-ids))))))))
 
 (define (comment-has-children? node-id)
   (let* ((conn (current-connection))
