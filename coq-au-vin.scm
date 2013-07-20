@@ -194,6 +194,9 @@
     (make-pathname (make-pathname (%blog-root%) "data") "example.db")
     (lambda (conn)
       (db:current-connection conn)
+      (if (can-login? uname)
+        (let ((phash (string->sha1sum password)))
+          (if (string=? phash (get-passhash uname))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
