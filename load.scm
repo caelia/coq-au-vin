@@ -70,6 +70,16 @@
    ("%ANONYMOUS:41" "postmodernism")
    ("%ANONYMOUS:42" "chocolate" "beer" "radiation" "korea")))
 
+(define authors
+  '(((uname . "ali") (password . "griot") (email . "ali@mali.net") (role . "author") (display_name . "Ali Farka Toure"))
+    ((uname . "jason") (password . "argonaut") (email . "jason@athens.org") (role . "editor") (display_name . "Just Jason"))
+    ((uname . "jonathan") (password . "appleseed") (email . "johnny@appleseed.com") (role . "author"))
+    ((uname . "judy") (password . "inthesky") (email . "judyblue@gmail.com") (role . "author") (display_name . "Judy Blue Eyes"))
+    ((uname . "madeleine") (password . "awesome") (email . "msc@gmail.com") (role . "editor") (display_name . "Madeleine St. Clair"))
+    ((uname . "matt") (password . "daman") (email . "matt@matt.org") (role . "admin") (display_name . "Matt the Cat"))
+    ((uname . "megan") (password . "shirley") (email . "megan@megan.net") (role . "author"))
+    ((uname . "valerie") (password . "actress") (email . "vb@gmail.com") (role . "author") (display_name . "Valerie Bertinelli"))))
+
 (define articles
  '(("/articles/a3b28001"
     ("author" . "ali") ("timestamp" . #,(date 0 16 29 16 6 12 2010 -25200 MST #f 1 340 #f))
