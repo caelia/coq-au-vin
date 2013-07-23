@@ -1,6 +1,11 @@
 (use srfi-19)
 (use srfi-13)
 (use sql-de-lite)
+(use simple-sha1)
+(use numbers)
+
+(define (alist-stref match lst)
+  (alist-ref match lst string=?))
 
 (define tag-sets
  '(("%ANONYMOUS:1" "chocolate" "brazil")
@@ -88,7 +93,7 @@
         (incr-cdr (lambda (x) (set-cdr! x (+ (cdr x) 1)) (cdr x))))
     (incr-cdr current-series)))
 
-(define articles
+(define article-data
  '((("author" . "ali") ("created_dt" . #,(date 0 16 29 16 6 12 2010 -25200 MST #f 1 340 #f))
     ("title" . "Duane Slats Plans Misgendered Systems") ("tags" . "%ANONYMOUS:1")
     ("series" . "Evil Corporadoes Perpetrate Evil")
@@ -306,16 +311,16 @@
          (n (string->number n* 16)))
     (string-append "#x" (string-pad (sprintf "~X" n) 8 #\0))))
 
-(define tag-sets-renumbered
+(define (renumber-tag-sets #!optional (sets tag-sets))
   (map
     (lambda (elt)
       (let ((id (car elt))
             (tags (cdr elt)))
         (cons (anon-hex-string id) tags)))
-    tag-sets))
+    sets))
 
 (define (union-tags)
-  (let loop ((tag-sets tag-sets-renumbered)
+  (let loop ((tag-sets (renumber-tag-sets))
              (all-tags '()))
     (if (null? tag-sets)
       all-tags
@@ -348,57 +353,92 @@
           (lambda (s) (exec st (car s)))
           series)))))
 
+(define (store-roles)
+  (call-with-database
+    "examples/demo-site1/data/preloaded.db"
+    (lambda (db)
+      (let ((st (sql db "INSERT INTO roles (name) VALUES (?);")))
+        (for-each
+          (lambda (rname) (exec st rname))
+          '("admin" "editor" "author" "guest"))))))
+
+(define (store-authors)
+  (call-with-database
+    "examples/demo-site1/data/preloaded.db"
+    (lambda (db)
+      (let ((st/dispname
+              (sql db
+                   "INSERT INTO users (uname, passhash, email, role, display_name)
+                     SELECT ?, ?, ?, roles.id, ? FROM roles WHERE roles.name = ?;"))
+            (st/plain
+              (sql db
+                   "INSERT INTO users (uname, passhash, email, role)
+                     SELECT ?, ?, ?, roles.id FROM roles WHERE roles.name = ?;")))
+        (for-each
+          (lambda (auth)
+            (let* ((uname (alist-ref 'uname auth))
+                   (password (alist-ref 'password auth))
+                   (phash (string->sha1sum password))
+                   (email (alist-ref 'email auth))
+                   (role (alist-ref 'role auth))
+                   (display-name (alist-ref 'display_name auth)))
+              (if display-name
+                (exec st/dispname uname phash email display-name role)
+                (exec st/plain uname phash email role))))
+          authors)))))
+
 (define (fix-article-datum ad)
   (let ((key (car ad))
         (value (cdr ad)))
     (cond
       ((string=? key "created_dt")
-       (cons key (time->seconds (date->time value))))
+       (cons key (exact->inexact (time->seconds (date->time value)))))
       ((string=? key "tags")
        (cons key (anon-hex-string value)))
       (else
         ad))))
 
-(define fixed-articles
+(define (fixed-articles #!optional (data article-data))
   (map
     (lambda (art)
       (let ((id (car art))
             (data (cdr art)))
         (cons id (map fix-article-datum data))))
-    articles))
+    data))
 
-(define (store-articles)
+(define (store-articles #!optional (articles (fixed-articles)))
   (call-with-database
     "examples/demo-site1/data/preloaded.db"
     (lambda (db)
       (let ((st-art/series
               (sql db
                    "INSERT INTO articles (node_id, title, series, series_pt, created_dt)
-                     SELECT ?, ?, series(id), ?, ? FROM series
-                     WHERE series(title) = ?;"))
+                     SELECT ?, ?, series.id, ?, ? FROM series
+                     WHERE series.title = ?;"))
             (st-art/standalone
               (sql db
                    "INSERT INTO articles (node_id, title, created_dt) VALUES (?, ?, ?);"))
             (st-auth
               (sql db
                    "INSERT INTO articles_x_authors (article, author)
-                     SELECT articles(id), authors(id) FROM articles, authors
-                     WHERE articles(node_id) = ? AND authors(uname) = ?;"))
+                     SELECT articles.id, users.id FROM articles, users
+                     WHERE articles.node_id = ? AND users.uname = ?;"))
             (st-tag
               (sql db
                    "INSERT INTO articles_x_tags (article, tag)
-                     SELECT articles(id), tags(id) FROM articles, tags
-                     WHERE articles(node_id) = ? AND tags(tag) = ?;")))
+                     SELECT articles.id, tags.id FROM articles, tags
+                     WHERE articles.node_id = ? AND tags.tag = ?;")))
 
         (for-each
           (lambda (art)
-            (let* ((node-id (alist-ref "node_id" art))
-                   (title (alist-ref "title" art))
-                   (created-dt (alist-ref "created_dt" art))
-                   (series-title (alist-ref "series" art))
-                   (series-pt (and series (bump-partno series-title)))
-                   (tag-set-id (alist-ref "tags" art))
-                   (tags (alist-ref tag-set-id tag-sets-renumbered)))
+            (let* ((node-id (alist-stref "node_id" art))
+                   (title (alist-stref "title" art))
+                   (author (alist-stref "author" art))
+                   (created-dt (alist-stref "created_dt" art))
+                   (series-title (alist-stref "series" art))
+                   (series-pt (and series-title (bump-partno series-title)))
+                   (tag-set-id (alist-stref "tags" art))
+                   (tags (alist-stref tag-set-id (renumber-tag-sets))))
               (if series-title
                 (exec st-art/series node-id title series-pt created-dt series-title)
                 (exec st-art/standalone node-id title created-dt))
@@ -406,4 +446,11 @@
               (for-each
                 (lambda (t) (exec st-tag node-id t))
                 tags)))
-          fixed-articles)))))
+          articles)))))
+
+(define (setup)
+  (store-roles)
+  (store-authors)
+  (store-series)
+  (store-tags)
+  (store-articles))
