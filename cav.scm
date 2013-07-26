@@ -22,5 +22,5 @@ TEMPLATE
     (fprintf
       (current-error-port) 
       usage-template
-      prog prog prog prog prog prog prog prog)))
+      progname progname progname progname progname progname progname progname)))
 
