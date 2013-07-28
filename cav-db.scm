@@ -378,11 +378,19 @@ INSERT INTO articles_x_categories (article, category)
 SQL
 )
 
-(define get-article-query
+(define get-article-by-nodeid-query
 #<<SQL
-SELECT title, series, series_pt, subtitle, created_dt, teaser_len, alias
+SELECT title, series, series_pt, subtitle, created_dt, teaser_len
 FROM articles
 WHERE node_id = ?;
+SQL
+)
+
+(define get-article-by-alias-query
+#<<SQL
+SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len
+FROM articles
+WHERE alias = ?;
 SQL
 )
 
@@ -536,6 +544,21 @@ SQL
   (let* ((conn (current-connection))
          (st (sql/transient conn add-comment-query)))
     (exec st text parent article author)))
+
+(define (get-article-by-nodeid node-id)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn get-article-by-nodeid-query))
+         (article-data (query fetch-alist st node-id))
+         (content (get-article-content node-id)))
+    (cons (cons 'content content) article-data)))
+
+(define (get-article-by-alias alias)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn get-article-by-alias-query))
+         (article-data (query fetch-alist st alias))
+         (node-id (alist-ref 'node_id article-data))
+         (content (get-article-content node-id)))
+    (cons (cons 'content content) article-data)))
 
 (define (get-article-comment-ids node-id)
   (let* ((conn (current-connection))
