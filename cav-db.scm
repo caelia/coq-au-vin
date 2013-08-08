@@ -562,10 +562,10 @@ SQL
 (define get-article-authors-query
 #<<SQL
 SELECT uname, display_name
-FROM users
-WHERE users(id) = articles_x_authors(author)
-AND articles_x_authors(article) = articles(id)
-AND articles(node_id) = ?;
+FROM users, articles, articles_x_authors
+WHERE users.id = articles_x_authors.author
+AND articles_x_authors.article = articles.id
+AND articles.node_id = ?;
 SQL
 )
 
