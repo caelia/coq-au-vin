@@ -9,11 +9,15 @@
 (import ports)
 
 (use lowdown)
-(use civet)
+(use (prefix civet cvt:))
 (use srfi-69)
 ; (use crypt)
 ;; FIXME: Need a better password hash!
 (use simple-sha1)
+
+(use spiffy)
+(use intarweb)
+(use matchable)
 
 ;; temporary
 (load "cav-db.so")
@@ -24,7 +28,7 @@
 
 (define (eprintf fmt . args)
   (error (apply sprintf (cons fmt args))))
-
+ 
 (define (strip-html str)
   (let* ((in-tag #f)
          (enter-tag
@@ -73,11 +77,11 @@
                (display "&lt;")
                (loop (read-char)))
               ((char=? c #\>)
-               (display "&gt;"))
+               (display "&gt;")
                (loop (read-char)))
               (else
                 (write-char c)
-                (loop (read-char)))))))))
+                (loop (read-char))))))))))
 
 (define (string->bool s)
   (let ((s (string-downcase s)))
@@ -85,6 +89,11 @@
       ((string=? s "true") #t)
       ((string=? s "false") #t)
       (eprintf "'~A' does not represent a boolean value.\n"))))
+
+; This is not absolutely foolproof, but I think it's close enough
+(define (node-id? s)
+  (and (= (string-length s) 8)
+       (string->number (string-append "#x" s))))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -194,9 +203,12 @@
     (make-pathname (make-pathname (%blog-root%) "data") "example.db")
     (lambda (conn)
       (db:current-connection conn)
-      (if (can-login? uname)
+      (if (db:can-login? uname)
         (let ((phash (string->sha1sum password)))
-          (if (string=? phash (get-passhash uname))
+          (if (string=? phash (db:get-passhash uname))
+            ;;; FIXME: obviously bogus code here!
+            #t
+            #f))))))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -224,14 +236,14 @@
       tpl-path
       (eprintf "[get-template] Template file '~A' not found." tpl-path))))
 
-(define (teaser article-id)
-  (or (get-teaser article-id)
-      (default-teaser (get-body article-id))))
-
-(define (latest #!optional (n 10))
-  (for-each
-    (lambda (id) (teaser id))
-    (index-ref 'post-order 10)))
+; (define (teaser article-id)
+;   (or (get-teaser article-id)
+;       (default-teaser (get-body article-id))))
+; 
+; (define (latest #!optional (n 10))
+;   (for-each
+;     (lambda (id) (teaser id))
+;     (index-ref 'post-order 10)))
 
 (define (init blog-root)
   (%blog-root% blog-root)
@@ -243,6 +255,27 @@
         db:add-role
         '("admin" "editor" "author" "member" "guest")))))
 
+;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+
+
+
+;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+;;; --  WEB INTERFACE  -----------------------------------------------------
+
+(define (get-article/html id/alias #!optional (out (current-output-port)))
+  (let* ((article-data
+          (if (node-id? id/alias)
+            (db:get-article-by-nodeid id/alias)
+            (db:get-article-by-alias id/alias)))
+         (raw-body (alist-ref 'body (alist-ref 'content article-data)))
+         (sanitized-body (escape-html raw-body))
+         (html-body (markdown->html sanitized-body)))
+    (display html-body out)))
+
+
+;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+
+
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ------------------------------------------------------------------------
@@ -252,3 +285,4 @@
 ;;; ========================================================================
 ;;; ------------------------------------------------------------------------
 
+; vim:et:ai:ts=2 sw=2
