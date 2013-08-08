@@ -7,6 +7,10 @@
         *
         (import scheme chicken)
         (import extras)
+        (import files)
+        (import utils)
+        (import ports)
+        (import data-structures)
 
         (use utf8)
         (use utf8-srfi-13)
@@ -16,6 +20,10 @@
 (define current-connection (make-parameter #f))
 
 (define first-id (make-parameter (lambda (_) 0)))
+
+(define db-file (make-parameter #f))
+
+(define content-path (make-parameter #f))
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  INITIAL SETUP  ---------------------------------------------------
@@ -378,50 +386,6 @@ INSERT INTO articles_x_categories (article, category)
 SQL
 )
 
-(define get-article-by-nodeid-query
-#<<SQL
-SELECT title, series, series_pt, subtitle, created_dt, teaser_len
-FROM articles
-WHERE node_id = ?;
-SQL
-)
-
-(define get-article-by-alias-query
-#<<SQL
-SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len
-FROM articles
-WHERE alias = ?;
-SQL
-)
-
-(define get-article-authors-query
-#<<SQL
-SELECT uname, display_name
-FROM users
-WHERE users(id) = articles_x_authors(author)
-AND articles_x_authors(article) = articles(id)
-AND articles(node_id) = ?;
-SQL
-)
-
-(define get-article-tags-query
-#<<SQL
-SELECT tag FROM tags
-WHERE tags(id) = articles_x_tags(tag)
-AND articles_x_tags(article) = articles(id)
-AND articles(node_id) = ?;
-SQL
-)
-
-(define get-article-categories-query
-#<<SQL
-SELECT category FROM categories
-WHERE categories(id) = articles_x_categories(category)
-AND articles_x_categories(article) = articles(id)
-AND articles(node_id) = ?;
-SQL
-)
-
 (define update-article-query
 #<<SQL
 UPDATE articles
@@ -465,17 +429,7 @@ WHERE articles(node_id) = ? AND users(uname) = ?;
 SQL
 )
 
-(define get-article-comment-ids-query
-#<<SQL
-SELECT node_id FROM comments
-WHERE article = articles(id) AND articles(node_id) = ?
-AND parent = NULL;
-SQL
-)
-
-(define get-comment-query
-  "SELECT author, created_dt, text WHERE node_id = ?;")
-
+;; Should these be moved to the RETRIEVAL section?
 (define comment-parent-query
   "SELECT parent FROM comments WHERE node_id = ?;")
 
@@ -545,37 +499,6 @@ SQL
          (st (sql/transient conn add-comment-query)))
     (exec st text parent article author)))
 
-(define (get-article-by-nodeid node-id)
-  (let* ((conn (current-connection))
-         (st (sql/transient conn get-article-by-nodeid-query))
-         (article-data (query fetch-alist st node-id))
-         (content (get-article-content node-id)))
-    (cons (cons 'content content) article-data)))
-
-(define (get-article-by-alias alias)
-  (let* ((conn (current-connection))
-         (st (sql/transient conn get-article-by-alias-query))
-         (article-data (query fetch-alist st alias))
-         (node-id (alist-ref 'node_id article-data))
-         (content (get-article-content node-id)))
-    (cons (cons 'content content) article-data)))
-
-(define (get-article-comment-ids node-id)
-  (let* ((conn (current-connection))
-         (st (sql/transient conn get-article-comment-ids-query)))
-    (query fetch-all st node-id)))
-
-(define (get-comment-thread node-id #!optional (depth #f))
-  (let* ((conn (current-connection))
-         (st-kids (sql conn add-comment-query))
-         (st-content (sql conn get-comment-query)))
-    (let loop ((id node-id))
-      (let* ((content (query fetch-alist st-content id))
-             (kid-ids (query fetch-all st-kids id)))
-        (if (null? kid-ids)
-          content
-          (append content `(children . ,(map loop kid-ids))))))))
-
 (define (comment-has-children? node-id)
   (let* ((conn (current-connection))
          (st (sql/transient conn comment-children-query)))
@@ -610,6 +533,133 @@ SQL
          (st-delete (sql conn delete-comment-query)))
     (delete-tree node-id st-children st-parent st-delete)))
 
+
+;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+
+
+
+;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+;;; ----  RETRIEVING CONTENT  ----------------------------------------------
+
+;;; ------  SQL Queries  ---------------------------------------------------
+
+(define get-article-by-nodeid-query
+#<<SQL
+SELECT title, series, series_pt, subtitle, created_dt, teaser_len
+FROM articles
+WHERE node_id = ?;
+SQL
+)
+
+(define get-article-by-alias-query
+#<<SQL
+SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len
+FROM articles
+WHERE alias = ?;
+SQL
+)
+
+(define get-article-authors-query
+#<<SQL
+SELECT uname, display_name
+FROM users
+WHERE users(id) = articles_x_authors(author)
+AND articles_x_authors(article) = articles(id)
+AND articles(node_id) = ?;
+SQL
+)
+
+(define get-article-tags-query
+#<<SQL
+SELECT tag FROM tags
+WHERE tags(id) = articles_x_tags(tag)
+AND articles_x_tags(article) = articles(id)
+AND articles(node_id) = ?;
+SQL
+)
+
+(define get-article-categories-query
+#<<SQL
+SELECT category FROM categories
+WHERE categories(id) = articles_x_categories(category)
+AND articles_x_categories(article) = articles(id)
+AND articles(node_id) = ?;
+SQL
+)
+
+(define get-article-comment-ids-query
+#<<SQL
+SELECT node_id FROM comments
+WHERE article = articles(id) AND articles(node_id) = ?
+AND parent = NULL;
+SQL
+)
+
+(define get-comment-query
+  "SELECT author, created_dt, text WHERE node_id = ?;")
+
+;;; ========================================================================
+;;; ------  Functions  -----------------------------------------------------
+
+; This only deals with the markdown original. Not sure where we should handle
+; cached html.
+; (define (get-article-body path #!optional (out #f))
+(define (get-article-body path)
+  (let ((body-path (make-pathname path "body")))
+    (with-output-to-string
+      (lambda ()
+        (with-input-from-file
+          body-path
+          (lambda ()
+            (display (read-all))))))))
+
+; (define (get-article-content node-id #!optional (out #f))
+(define (get-article-content node-id)
+  (let ((article-path (make-pathname (content-path) node-id))) 
+    `((body . ,(get-article-body article-path)))))
+
+(define (get-article-by-nodeid node-id)
+  (let* ((conn (current-connection))
+         (st-data (sql/transient conn get-article-by-nodeid-query))
+         (st-auth (sql/transient conn get-article-authors-query))
+         (article-data (query fetch-alist st-data node-id))
+         (authors (query fetch st-auth node-id))
+         (content (get-article-content node-id)))
+    (cons
+      (cons 'content content)
+      (cons
+        (cons 'authors authors)
+        article-data))))
+
+(define (get-article-by-alias alias)
+  (let* ((conn (current-connection))
+         (st-data (sql/transient conn get-article-by-alias-query))
+         (st-auth (sql/transient conn get-article-authors-query))
+         (article-data (query fetch-alist st-data alias))
+         (node-id (alist-ref 'node_id article-data))
+         (authors (query fetch-all st-auth node-id))
+         (content (get-article-content node-id)))
+    (cons
+      (cons 'content content)
+      (cons
+        (cons 'authors authors)
+        article-data))))
+
+(define (get-article-comment-ids node-id)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn get-article-comment-ids-query)))
+    (query fetch-all st node-id)))
+
+(define (get-comment-thread node-id #!optional (depth #f))
+  (let* ((conn (current-connection))
+         (st-kids (sql conn add-comment-query))
+         (st-content (sql conn get-comment-query)))
+    (let loop ((id node-id))
+      (let* ((content (query fetch-alist st-content id))
+             (kid-ids (query fetch-all st-kids id)))
+        (if (null? kid-ids)
+          content
+          (append content `(children . ,(map loop kid-ids))))))))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
