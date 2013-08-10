@@ -1,4 +1,5 @@
-;;; cav-db.scm -- A sqlite3 database layer for Coq au Vin.
+;;; cav-db-sqlite.scm -- A SQLite3 database layer for Coq au Vin.
+;;;
 ;;;   Copyright © 2013 by Matthew C. Gushee <matt@gushee.net>
 ;;;   This program is open-source software, released under the
 ;;;   BSD license. See the accompanying LICENSE file for details.
@@ -17,13 +18,14 @@
         (use sql-de-lite)
         (use srfi-19)
 
-(define current-connection (make-parameter #f))
+% These 4 params probably only needed in cav-db
+% (define current-connection (make-parameter #f))
 
-(define first-id (make-parameter (lambda (_) 0)))
+% (define first-id (make-parameter (lambda (_) 0)))
 
-(define db-file (make-parameter #f))
+% (define db-file (make-parameter #f))
 
-(define content-path (make-parameter #f))
+% (define content-path (make-parameter #f))
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  INITIAL SETUP  ---------------------------------------------------
@@ -147,7 +149,7 @@ SQL
 ;;; ========================================================================
 ;;; ------  Functions  -----------------------------------------------------
 
-(define (setup-db filename #!optional (force #f))
+(define (%setup-db filename #!optional (force #f))
   (when (file-exists? filename)
     (if force
       (delete-file filename)
@@ -244,62 +246,62 @@ SQL
 ;;; ========================================================================
 ;;; ------  Functions  -----------------------------------------------------
 
-(define (add-role role-name)
+(define (%add-role role-name)
   (let* ((conn (current-connection))
          (st (sql/transient conn add-role-query)))
     (exec st role-name)))
 
-(define (delete-role role-name)
+(define (%delete-role role-name)
   (let* ((conn (current-connection))
          (st (sql/transient conn delete-role-query)))
     (exec st role-name)))
 
-(define (add-user uname phash email role #!optional (disp-name '()))
+(define (%add-user uname phash email role #!optional (disp-name '()))
   (let* ((conn (current-connection))
          (st (sql/transient conn add-user-query)))
     (exec st uname phash email disp-name role)))
 
-(define (user-exists? uname)
+(define (%user-exists? uname)
   (let* ((conn (current-connection))
          (st (sql/transient conn user-exists-query)))
     (query fetch-value st uname)))
 
-(define (get-user-info uname)
+(define (%get-user-info uname)
   (let* ((conn (current-connection))
          (st (sql/transient conn get-user-info-query)))
     (query fetch-alist st uname)))
 
-(define (get-user-role uname)
+(define (%get-user-role uname)
   (let* ((conn (current-connection))
          (st (sql/transient conn get-user-role-query)))
     (query fetch-value st uname)))
 
-(define (update-password uname phash)
+(define (%update-password uname phash)
   (let* ((conn (current-connection))
          (st (sql/transient conn update-password-query)))
     (exec st phash uname)))
 
-(define (update-user-info uname email role #!optional (disp-name '()))
+(define (%update-user-info uname email role #!optional (disp-name '()))
   (let* ((conn (current-connection))
          (st (sql/transient conn update-user-info-query)))
     (exec st email role disp-name uname)))
 
-(define (delete-user uname)
+(define (%delete-user uname)
   (let* ((conn (current-connection))
          (st (sql/transient conn delete-user-query)))
     (exec st uname)))
 
-(define (can-login? uname)
+(define (%can-login? uname)
   (let* ((conn (current-connection))
          (st (sql/transient conn user-blocked-query)))
     (not (query fetch-value st uname (current-seconds)))))
 
-(define (get-passhash uname)
+(define (%get-passhash uname)
   (let* ((conn (current-connection))
          (st (sql/transient conn user-blocked-query)))
     (query fetch-value st)))
 
-(define (bad-login uname)
+(define (%bad-login uname)
   (let* ((conn (current-connection))
          (s-count (sql/transient conn bad-login-count-query))
          (s-add (sql/transient conn add-bad-login-query))
@@ -313,32 +315,32 @@ SQL
           (exec s-block (+ current-seconds 120) uname))
         (exec s-add (current-seconds) uname)))))
 
-(define (clear-bad-logins uname)
+(define (%clear-bad-logins uname)
   (let* ((conn (current-connection))
          (st (sql/transient conn clear-bad-logins-query)))
     (exec st uname)))
 
-(define (add-session key uname expires)
+(define (%add-session key uname expires)
   (let* ((conn (current-connection))
          (st (sql/transient conn add-session-query)))
     (exec st key expires uname)))
 
-(define (refresh-session key expires)
+(define (%refresh-session key expires)
   (let* ((conn (current-connection))
          (st (sql/transient conn refresh-session-query)))
     (exec st expires key)))
 
-(define (session-valid? key)
+(define (%session-valid? key)
   (let* ((conn (current-connection))
          (st (sql/transient conn session-valid-query)))
     (query fetch-value st key (current-seconds))))
 
-(define (session-exists? key)
+(define (%session-exists? key)
   (let* ((conn (current-connection))
          (st (sql/transient conn session-exists-query)))
     (query fetch-value st key)))
 
-(define (delete-session key)
+(define (%delete-session key)
   (let* ((conn (current-connection))
          (st (sql/transient conn delete-session-query)))
     (exec st key)))
@@ -450,7 +452,7 @@ SQL
 ;;; ========================================================================
 ;;; ------  Functions  -----------------------------------------------------
 
-(define (create-article node-id title author/s
+(define (%create-article node-id title author/s
                         #!key (series '()) (series-pt '()) (subtitle '())
                         (teaser-len '()) (alias '()) (tags '()) (categories '()))
   (let* ((authors (if (list? author/s) author/s (list author/s)))
@@ -470,7 +472,7 @@ SQL
       (lambda (cat) (exec st-cat node-id cat))
       categories)))
 
-(define (update-article node-id #!key (title '()) (series '()) (series-pt '()) (subtitle '())
+(define (%update-article node-id #!key (title '()) (series '()) (series-pt '()) (subtitle '())
                         (teaser-len '()) (alias '()) (tags '()) (categories '()))
   (let* ((conn (current-connection))
          (st-art (sql/transient conn update-article-query))
@@ -484,7 +486,7 @@ SQL
       (lambda (cat) (exec st-cat node-id cat))
       categories)))
 
-(define (delete-article node-id)
+(define (%delete-article node-id)
   (let* ((conn (current-connection))
          (st-art (sql/transient conn delete-article-query))
          (st-auth (sql conn delete-article-author-query))
@@ -494,17 +496,17 @@ SQL
       (lambda (st) (exec st node-id))
       `(,st-art ,st-auth ,st-tag ,st-cat))))
 
-(define (add-comment node-id article author text #!optional (parent #f))
+(define (%add-comment node-id article author text #!optional (parent #f))
   (let* ((conn (current-connection))
          (st (sql/transient conn add-comment-query)))
     (exec st text parent article author)))
 
-(define (comment-has-children? node-id)
+(define (%comment-has-children? node-id)
   (let* ((conn (current-connection))
          (st (sql/transient conn comment-children-query)))
     (query fetch-value st node-id)))
 
-(define (delete-comment node-id)
+(define (%delete-comment node-id)
   (let* ((conn (current-connection))
          (st-children? (sql/transient conn comment-children-query))
          (st-nullify (sql/transient conn nullify-comment-query))
@@ -514,7 +516,7 @@ SQL
       (exec st-nullify node-id)
       (exec st-delete node-id))))
 
-(define (delete-tree node-id st-children st-parent st-delete)
+(define (%delete-tree node-id st-children st-parent st-delete)
   (let ((children (query fetch-all st-children node-id))
         (parent (query fetch-value st-parent node-id)))
     (if (null? children)
@@ -526,7 +528,7 @@ SQL
         (lambda (child) (delete-tree child st-children st-parent st-delete))
         children))))
 
-(define (delete-thread node-id)
+(define (%delete-thread node-id)
   (let* ((conn (current-connection))
          (st-children (sql conn comment-children-query))
          (st-parent (sql conn comment-parent-query))
@@ -604,7 +606,7 @@ SQL
 ; This only deals with the markdown original. Not sure where we should handle
 ; cached html.
 ; (define (get-article-body path #!optional (out #f))
-(define (get-article-body path)
+(define (%get-article-body path)
   (let ((body-path (make-pathname path "body")))
     (with-output-to-string
       (lambda ()
@@ -614,11 +616,11 @@ SQL
             (display (read-all))))))))
 
 ; (define (get-article-content node-id #!optional (out #f))
-(define (get-article-content node-id)
+(define (%get-article-content node-id)
   (let ((article-path (make-pathname (content-path) node-id))) 
     `((body . ,(get-article-body article-path)))))
 
-(define (get-article-by-nodeid node-id)
+(define (%get-article-by-nodeid node-id)
   (let* ((conn (current-connection))
          (st-data (sql/transient conn get-article-by-nodeid-query))
          (st-auth (sql/transient conn get-article-authors-query))
@@ -631,7 +633,7 @@ SQL
         (cons 'authors authors)
         article-data))))
 
-(define (get-article-by-alias alias)
+(define (%get-article-by-alias alias)
   (let* ((conn (current-connection))
          (st-data (sql/transient conn get-article-by-alias-query))
          (st-auth (sql/transient conn get-article-authors-query))
@@ -645,12 +647,12 @@ SQL
         (cons 'authors authors)
         article-data))))
 
-(define (get-article-comment-ids node-id)
+(define (%get-article-comment-ids node-id)
   (let* ((conn (current-connection))
          (st (sql/transient conn get-article-comment-ids-query)))
     (query fetch-all st node-id)))
 
-(define (get-comment-thread node-id #!optional (depth #f))
+(define (%get-comment-thread node-id #!optional (depth #f))
   (let* ((conn (current-connection))
          (st-kids (sql conn add-comment-query))
          (st-content (sql conn get-comment-query)))
@@ -662,6 +664,61 @@ SQL
           (append content `(children . ,(map loop kid-ids))))))))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+
+
+(define (instantiate-dbi)
+  (setup-db %setup-db)
+  (add-role %add-role)
+  (delete-role %delete-role)
+  (add-user %add-user)
+  (user-exists? %user-exists?)
+  (get-user-info %get-user-info)
+  (get-user-role %get-user-role)
+  (update-password %update-password)
+  (update-user-info %update-user-info)
+  (delete-user %delete-user)
+  (can-login? %can-login?)
+  (get-passhash %get-passhash)
+  (bad-login %bad-login)
+  (clear-bad-logins %clear-bad-logins)
+  (add-session %add-session)
+  (refresh-session %refresh-session)
+  (session-valid? %session-valid?)
+  (session-exists? %session-exists?)
+  (delete-session %delete-session)
+  (create-article %create-article)
+  (update-article %update-article)
+  (delete-article %delete-article)
+  (add-comment %add-comment)
+  (comment-has-children? %comment-has-children?)
+  (delete-comment %delete-comment)
+  (delete-tree %delete-tree)
+  (delete-thread %delete-thread)
+  (get-article-body %get-article-body)
+  (get-article-content %get-article-content)
+  (get-article-by-nodeid %get-article-by-nodeid)
+  (get-article-by-alias %get-article-by-alias)
+  (get-article-comment-ids %get-article-comment-ids)
+  (get-comment-thread %get-comment-thread))
+
+;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+
+
+) ; END MODULE
+
+;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+;;; ------------------------------------------------------------------------
+
+;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+
+;;; ========================================================================
+;;; ------------------------------------------------------------------------
+
+
+
+
+
+
 
 
 ) ; END MODULE
