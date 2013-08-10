@@ -20,7 +20,11 @@
 (use matchable)
 
 ;; temporary
-(load "cav-db.so")
+(let ((backend (get-environment-variable "CAV_DB_BACKEND")))
+  (cond
+    ((string=? backend "sqlite") (load "cav-db-sqlite.so"))
+    ((string=? backend "postgresql") (load "cav-db-postgresql.so"))
+    (else (load "cav-db-sqlite.so"))))
 (import (prefix cav-db db:))
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
