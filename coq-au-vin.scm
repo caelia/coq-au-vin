@@ -19,12 +19,7 @@
 (use intarweb)
 (use matchable)
 
-;; temporary
-(let ((backend (get-environment-variable "CAV_DB_BACKEND")))
-  (cond
-    ((string=? backend "sqlite") (load "cav-db-sqlite.so"))
-    ((string=? backend "postgresql") (load "cav-db-postgresql.so"))
-    (else (load "cav-db-sqlite.so"))))
+(require-library cav-db)
 (import (prefix cav-db db:))
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
@@ -199,17 +194,17 @@
     (call-with-database
       (make-pathname (make-pathname (%blog-root%) "data") "example.db")
       (lambda (conn)
-        (db:current-connection conn)
-        (db:add-user uname phash email role disp-name))))) 
+        ((db:current-connection) conn)
+        ((db:add-user) uname phash email role disp-name))))) 
 
 (define (login uname password)
   (call-with-database
     (make-pathname (make-pathname (%blog-root%) "data") "example.db")
     (lambda (conn)
-      (db:current-connection conn)
-      (if (db:can-login? uname)
+      ((db:current-connection) conn)
+      (if ((db:can-login?) uname)
         (let ((phash (string->sha1sum password)))
-          (if (string=? phash (db:get-passhash uname))
+          (if (string=? phash ((db:get-passhash) uname))
             ;;; FIXME: obviously bogus code here!
             #t
             #f))))))
@@ -254,7 +249,7 @@
   (call-with-database
     (make-pathname (make-pathname blog-root "data") "example.db")
     (lambda (conn)
-      (db:current-connection conn)
+      ((db:current-connection) conn)
       (for-each
         db:add-role
         '("admin" "editor" "author" "member" "guest")))))
@@ -269,8 +264,8 @@
 (define (get-article/html id/alias #!optional (out (current-output-port)))
   (let* ((article-data
           (if (node-id? id/alias)
-            (db:get-article-by-nodeid id/alias)
-            (db:get-article-by-alias id/alias)))
+            ((db:get-article-by-nodeid) id/alias)
+            ((db:get-article-by-alias) id/alias)))
          (raw-body (alist-ref 'body (alist-ref 'content article-data)))
          (sanitized-body (escape-html raw-body))
          (html-body (markdown->html sanitized-body)))
