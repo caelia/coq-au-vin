@@ -192,27 +192,27 @@
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  USERS, SESSIONS, AUTHENTICATION  ---------------------------------
 
-(define (register-user uname password email role #!optional (disp-name '()))
-  (let ((phash (string->sha1sum password)))
-    (unless (member role '("editor" "author" "member"))
-      (error (string-append "'" role "' is not a recognized role.")))
-    (call-with-database
-      (make-pathname (make-pathname (%blog-root%) "data") "example.db")
-      (lambda (conn)
-        ((db:current-connection) conn)
-        ((db:add-user) uname phash email role disp-name))))) 
+; (define (register-user uname password email role #!optional (disp-name '()))
+;   (let ((phash (string->sha1sum password)))
+;     (unless (member role '("editor" "author" "member"))
+;       (error (string-append "'" role "' is not a recognized role.")))
+;     (call-with-database
+;       (make-pathname (make-pathname (%blog-root%) "data") "example.db")
+;       (lambda (conn)
+;         ((db:current-connection) conn)
+;         ((db:add-user) uname phash email role disp-name))))) 
 
-(define (login uname password)
-  (call-with-database
-    (make-pathname (make-pathname (%blog-root%) "data") "example.db")
-    (lambda (conn)
-      ((db:current-connection) conn)
-      (if ((db:can-login?) uname)
-        (let ((phash (string->sha1sum password)))
-          (if (string=? phash ((db:get-passhash) uname))
-            ;;; FIXME: obviously bogus code here!
-            #t
-            #f))))))
+; (define (login uname password)
+;   (call-with-database
+;     (make-pathname (make-pathname (%blog-root%) "data") "example.db")
+;     (lambda (conn)
+;       ((db:current-connection) conn)
+;       (if ((db:can-login?) uname)
+;         (let ((phash (string->sha1sum password)))
+;           (if (string=? phash ((db:get-passhash) uname))
+;             ;;; FIXME: obviously bogus code here!
+;             #t
+;             #f))))))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -249,15 +249,15 @@
 ;     (lambda (id) (teaser id))
 ;     (index-ref 'post-order 10)))
 
-(define (init blog-root)
-  (%blog-root% blog-root)
-  (call-with-database
-    (make-pathname (make-pathname blog-root "data") "example.db")
-    (lambda (conn)
-      ((db:current-connection) conn)
-      (for-each
-        db:add-role
-        '("admin" "editor" "author" "member" "guest")))))
+; (define (init blog-root)
+;   (%blog-root% blog-root)
+;   (call-with-database
+;     (make-pathname (make-pathname blog-root "data") "example.db")
+;     (lambda (conn)
+;       ((db:current-connection) conn)
+;       (for-each
+;         db:add-role
+;         '("admin" "editor" "author" "member" "guest")))))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
