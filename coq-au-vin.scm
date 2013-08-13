@@ -3,24 +3,29 @@
 ;;;   This program is open-source software, released under the
 ;;;   BSD license. See the accompanying LICENSE file for details.
 
-(import scheme)
-(import chicken)
-(import files)
-(import ports)
-
-(use lowdown)
-(use (prefix civet cvt:))
-(use srfi-69)
-; (use crypt)
-;; FIXME: Need a better password hash!
-(use simple-sha1)
-
-(use spiffy)
-(use intarweb)
-(use matchable)
-
 (require-library cav-db)
-(import (prefix cav-db db:))
+
+(module coq-au-vin
+        *
+        (import scheme chicken)
+        (import files)
+        (import ports)
+        (import data-structures)
+        (import extras)
+        (import srfi-13)
+
+        (import (prefix cav-db db:))
+  
+        (use lowdown)
+        (use (prefix civet cvt:))
+        (use srfi-69)
+        ; (use crypt)
+        ; ;; FIXME: Need a better password hash! 
+        (use simple-sha1)
+
+        (use spiffy)
+        (use intarweb)
+        (use matchable)
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  UTILITY FUNCTIONS  -----------------------------------------------
@@ -274,6 +279,7 @@
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
+) ; END MODULE
 
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
