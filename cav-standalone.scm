@@ -5,8 +5,16 @@
 ;;;   BSD license. See the accompanying LICENSE file for details.
 
 (include "cav-db.scm")
+(include "cav-web.scm")
 (include "cav-db-sqlite.scm")
+(include "cav-web-spiffy.scm")
 (include "coq-au-vin.scm")
+
+(import cav-db-sqlite)
+
+(define (init)
+  (activate-sqlite)
+  (activate-spiffy))
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ------------------------------------------------------------------------
@@ -16,3 +24,4 @@
 ;;; ========================================================================
 ;;; ------------------------------------------------------------------------
 
+; vim:et:ai:ts=2 sw=2
