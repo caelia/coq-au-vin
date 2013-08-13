@@ -4,8 +4,12 @@
 ;;;   This program is open-source software, released under the
 ;;;   BSD license. See the accompanying LICENSE file for details.
 
-(module cav-db
-        *
+; Just for initial development phase
+(load "cav-db.so")
+
+(module cav-db-sqlite
+        (activate-sqlite open-database close-database)
+
         (import scheme chicken)
         (import extras)
         (import files)
@@ -15,17 +19,25 @@
 
         (use utf8)
         (use utf8-srfi-13)
-        (use sql-de-lite)
+        (use (prefix sql-de-lite sd:))
         (use srfi-19)
 
-% These 4 params probably only needed in cav-db
-% (define current-connection (make-parameter #f))
+        ; (use cav-db)
+        ; Just for initial development phase
+        ; (require-library cav-db)
+        (import cav-db)
 
-% (define first-id (make-parameter (lambda (_) 0)))
+; These 4 params probably only needed in cav-db
+; (define current-connection (make-parameter #f))
 
-% (define db-file (make-parameter #f))
+; (define first-id (make-parameter (lambda (_) 0)))
 
-% (define content-path (make-parameter #f))
+; (define db-file (make-parameter #f))
+
+; (define content-path (make-parameter #f))
+
+(define open-database sd:open-database)
+(define close-database sd:close-database)
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  INITIAL SETUP  ---------------------------------------------------
@@ -154,11 +166,11 @@ SQL
     (if force
       (delete-file filename)
       (error "DB file already exists.")))
-  (call-with-database
+  (sd:call-with-database
     filename
     (lambda (db)
       (for-each
-        (lambda (qs) (exec (sql db qs)))
+        (lambda (qs) (sd:exec (sd:sql db qs)))
         setup-queries))))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
@@ -248,102 +260,102 @@ SQL
 
 (define (%add-role role-name)
   (let* ((conn (current-connection))
-         (st (sql/transient conn add-role-query)))
-    (exec st role-name)))
+         (st (sd:sql/transient conn add-role-query)))
+    (sd:exec st role-name)))
 
 (define (%delete-role role-name)
   (let* ((conn (current-connection))
-         (st (sql/transient conn delete-role-query)))
-    (exec st role-name)))
+         (st (sd:sql/transient conn delete-role-query)))
+    (sd:exec st role-name)))
 
 (define (%add-user uname phash email role #!optional (disp-name '()))
   (let* ((conn (current-connection))
-         (st (sql/transient conn add-user-query)))
-    (exec st uname phash email disp-name role)))
+         (st (sd:sql/transient conn add-user-query)))
+    (sd:exec st uname phash email disp-name role)))
 
 (define (%user-exists? uname)
   (let* ((conn (current-connection))
-         (st (sql/transient conn user-exists-query)))
-    (query fetch-value st uname)))
+         (st (sd:sql/transient conn user-exists-query)))
+    (sd:query sd:fetch-value st uname)))
 
 (define (%get-user-info uname)
   (let* ((conn (current-connection))
-         (st (sql/transient conn get-user-info-query)))
-    (query fetch-alist st uname)))
+         (st (sd:sql/transient conn get-user-info-query)))
+    (sd:query sd:fetch-alist st uname)))
 
 (define (%get-user-role uname)
   (let* ((conn (current-connection))
-         (st (sql/transient conn get-user-role-query)))
-    (query fetch-value st uname)))
+         (st (sd:sql/transient conn get-user-role-query)))
+    (sd:query sd:fetch-value st uname)))
 
 (define (%update-password uname phash)
   (let* ((conn (current-connection))
-         (st (sql/transient conn update-password-query)))
-    (exec st phash uname)))
+         (st (sd:sql/transient conn update-password-query)))
+    (sd:exec st phash uname)))
 
 (define (%update-user-info uname email role #!optional (disp-name '()))
   (let* ((conn (current-connection))
-         (st (sql/transient conn update-user-info-query)))
-    (exec st email role disp-name uname)))
+         (st (sd:sql/transient conn update-user-info-query)))
+    (sd:exec st email role disp-name uname)))
 
 (define (%delete-user uname)
   (let* ((conn (current-connection))
-         (st (sql/transient conn delete-user-query)))
-    (exec st uname)))
+         (st (sd:sql/transient conn delete-user-query)))
+    (sd:exec st uname)))
 
 (define (%can-login? uname)
   (let* ((conn (current-connection))
-         (st (sql/transient conn user-blocked-query)))
-    (not (query fetch-value st uname (current-seconds)))))
+         (st (sd:sql/transient conn user-blocked-query)))
+    (not (sd:query sd:fetch-value st uname (current-seconds)))))
 
 (define (%get-passhash uname)
   (let* ((conn (current-connection))
-         (st (sql/transient conn user-blocked-query)))
-    (query fetch-value st)))
+         (st (sd:sql/transient conn user-blocked-query)))
+    (sd:query sd:fetch-value st)))
 
 (define (%bad-login uname)
   (let* ((conn (current-connection))
-         (s-count (sql/transient conn bad-login-count-query))
-         (s-add (sql/transient conn add-bad-login-query))
-         (s-clear (sql/transient conn clear-bad-logins-query))
-         (s-block (sql/transient conn block-user-query)))
-    (let ((count (query fetch-value s-count)))
+         (s-count (sd:sql/transient conn bad-login-count-query))
+         (s-add (sd:sql/transient conn add-bad-login-query))
+         (s-clear (sd:sql/transient conn clear-bad-logins-query))
+         (s-block (sd:sql/transient conn block-user-query)))
+    (let ((count (sd:query sd:fetch-value s-count)))
       (printf "bad login count: ~A\n" count)
       (if (and count (> count 1))
         (begin
-          (exec s-clear uname)
-          (exec s-block (+ current-seconds 120) uname))
-        (exec s-add (current-seconds) uname)))))
+          (sd:exec s-clear uname)
+          (sd:exec s-block (+ current-seconds 120) uname))
+        (sd:exec s-add (current-seconds) uname)))))
 
 (define (%clear-bad-logins uname)
   (let* ((conn (current-connection))
-         (st (sql/transient conn clear-bad-logins-query)))
-    (exec st uname)))
+         (st (sd:sql/transient conn clear-bad-logins-query)))
+    (sd:exec st uname)))
 
 (define (%add-session key uname expires)
   (let* ((conn (current-connection))
-         (st (sql/transient conn add-session-query)))
-    (exec st key expires uname)))
+         (st (sd:sql/transient conn add-session-query)))
+    (sd:exec st key expires uname)))
 
 (define (%refresh-session key expires)
   (let* ((conn (current-connection))
-         (st (sql/transient conn refresh-session-query)))
-    (exec st expires key)))
+         (st (sd:sql/transient conn refresh-session-query)))
+    (sd:exec st expires key)))
 
 (define (%session-valid? key)
   (let* ((conn (current-connection))
-         (st (sql/transient conn session-valid-query)))
-    (query fetch-value st key (current-seconds))))
+         (st (sd:sql/transient conn session-valid-query)))
+    (sd:query sd:fetch-value st key (current-seconds))))
 
 (define (%session-exists? key)
   (let* ((conn (current-connection))
-         (st (sql/transient conn session-exists-query)))
-    (query fetch-value st key)))
+         (st (sd:sql/transient conn session-exists-query)))
+    (sd:query sd:fetch-value st key)))
 
 (define (%delete-session key)
   (let* ((conn (current-connection))
-         (st (sql/transient conn delete-session-query)))
-    (exec st key)))
+         (st (sd:sql/transient conn delete-session-query)))
+    (sd:exec st key)))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -457,71 +469,71 @@ SQL
                         (teaser-len '()) (alias '()) (tags '()) (categories '()))
   (let* ((authors (if (list? author/s) author/s (list author/s)))
          (conn (current-connection))
-         (st-art (sql/transient conn create-article-query))
-         (st-auth (sql conn add-article-author-query))
-         (st-tag (sql conn add-article-tag-query))
-         (st-cat (sql conn add-article-category-query)))
-    (exec st-art node-id title series series-pt subtitle teaser-len alias)
+         (st-art (sd:sql/transient conn create-article-query))
+         (st-auth (sd:sql conn add-article-author-query))
+         (st-tag (sd:sql conn add-article-tag-query))
+         (st-cat (sd:sql conn add-article-category-query)))
+    (sd:exec st-art node-id title series series-pt subtitle teaser-len alias)
     (for-each
-      (lambda (auth) (exec st-auth node-id auth))
+      (lambda (auth) (sd:exec st-auth node-id auth))
       authors)
     (for-each
-      (lambda (tag) (exec st-tag node-id tag))
+      (lambda (tag) (sd:exec st-tag node-id tag))
       tags)
     (for-each
-      (lambda (cat) (exec st-cat node-id cat))
+      (lambda (cat) (sd:exec st-cat node-id cat))
       categories)))
 
 (define (%update-article node-id #!key (title '()) (series '()) (series-pt '()) (subtitle '())
                         (teaser-len '()) (alias '()) (tags '()) (categories '()))
   (let* ((conn (current-connection))
-         (st-art (sql/transient conn update-article-query))
-         (st-tag (sql conn add-article-tag-query))
-         (st-cat (sql conn add-article-category-query)))
-    (exec st-art title series series-pt subtitle teaser-len alias node-id)
+         (st-art (sd:sql/transient conn update-article-query))
+         (st-tag (sd:sql conn add-article-tag-query))
+         (st-cat (sd:sql conn add-article-category-query)))
+    (sd:exec st-art title series series-pt subtitle teaser-len alias node-id)
     (for-each
-      (lambda (tag) (exec st-tag node-id tag))
+      (lambda (tag) (sd:exec st-tag node-id tag))
       tags)
     (for-each
-      (lambda (cat) (exec st-cat node-id cat))
+      (lambda (cat) (sd:exec st-cat node-id cat))
       categories)))
 
 (define (%delete-article node-id)
   (let* ((conn (current-connection))
-         (st-art (sql/transient conn delete-article-query))
-         (st-auth (sql conn delete-article-author-query))
-         (st-tag (sql conn delete-article-tag-query))
-         (st-cat (sql conn delete-article-category-query)))
+         (st-art (sd:sql/transient conn delete-article-query))
+         (st-auth (sd:sql conn delete-article-author-query))
+         (st-tag (sd:sql conn delete-article-tag-query))
+         (st-cat (sd:sql conn delete-article-category-query)))
     (for-each
-      (lambda (st) (exec st node-id))
+      (lambda (st) (sd:exec st node-id))
       `(,st-art ,st-auth ,st-tag ,st-cat))))
 
 (define (%add-comment node-id article author text #!optional (parent #f))
   (let* ((conn (current-connection))
-         (st (sql/transient conn add-comment-query)))
-    (exec st text parent article author)))
+         (st (sd:sql/transient conn add-comment-query)))
+    (sd:exec st text parent article author)))
 
 (define (%comment-has-children? node-id)
   (let* ((conn (current-connection))
-         (st (sql/transient conn comment-children-query)))
-    (query fetch-value st node-id)))
+         (st (sd:sql/transient conn comment-children-query)))
+    (sd:query sd:fetch-value st node-id)))
 
 (define (%delete-comment node-id)
   (let* ((conn (current-connection))
-         (st-children? (sql/transient conn comment-children-query))
-         (st-nullify (sql/transient conn nullify-comment-query))
-         (st-delete (sql/transient conn delete-comment-query))
-         (has-children (query fetch-value st-children? node-id)))
+         (st-children? (sd:sql/transient conn comment-children-query))
+         (st-nullify (sd:sql/transient conn nullify-comment-query))
+         (st-delete (sd:sql/transient conn delete-comment-query))
+         (has-children (sd:query sd:fetch-value st-children? node-id)))
     (if has-children
-      (exec st-nullify node-id)
-      (exec st-delete node-id))))
+      (sd:exec st-nullify node-id)
+      (sd:exec st-delete node-id))))
 
 (define (%delete-tree node-id st-children st-parent st-delete)
-  (let ((children (query fetch-all st-children node-id))
-        (parent (query fetch-value st-parent node-id)))
+  (let ((children (sd:query sd:fetch-all st-children node-id))
+        (parent (sd:query sd:fetch-value st-parent node-id)))
     (if (null? children)
       (begin
-        (exec st-delete node-id)
+        (sd:exec st-delete node-id)
         (unless (null? parent)
           (delete-tree parent st-children st-parent st-delete)))
       (for-each
@@ -530,9 +542,9 @@ SQL
 
 (define (%delete-thread node-id)
   (let* ((conn (current-connection))
-         (st-children (sql conn comment-children-query))
-         (st-parent (sql conn comment-parent-query))
-         (st-delete (sql conn delete-comment-query)))
+         (st-children (sd:sql conn comment-children-query))
+         (st-parent (sd:sql conn comment-parent-query))
+         (st-delete (sd:sql conn delete-comment-query)))
     (delete-tree node-id st-children st-parent st-delete)))
 
 
@@ -618,15 +630,15 @@ SQL
 ; (define (get-article-content node-id #!optional (out #f))
 (define (%get-article-content node-id)
   (let ((article-path (make-pathname (content-path) node-id))) 
-    `((body . ,(get-article-body article-path)))))
+    `((body . ,(%get-article-body article-path)))))
 
 (define (%get-article-by-nodeid node-id)
   (let* ((conn (current-connection))
-         (st-data (sql/transient conn get-article-by-nodeid-query))
-         (st-auth (sql/transient conn get-article-authors-query))
-         (article-data (query fetch-alist st-data node-id))
-         (authors (query fetch st-auth node-id))
-         (content (get-article-content node-id)))
+         (st-data (sd:sql/transient conn get-article-by-nodeid-query))
+         (st-auth (sd:sql/transient conn get-article-authors-query))
+         (article-data (sd:query sd:fetch-alist st-data node-id))
+         (authors (sd:query sd:fetch st-auth node-id))
+         (content (%get-article-content node-id)))
     (cons
       (cons 'content content)
       (cons
@@ -635,12 +647,12 @@ SQL
 
 (define (%get-article-by-alias alias)
   (let* ((conn (current-connection))
-         (st-data (sql/transient conn get-article-by-alias-query))
-         (st-auth (sql/transient conn get-article-authors-query))
-         (article-data (query fetch-alist st-data alias))
+         (st-data (sd:sql/transient conn get-article-by-alias-query))
+         (st-auth (sd:sql/transient conn get-article-authors-query))
+         (article-data (sd:query sd:fetch-alist st-data alias))
          (node-id (alist-ref 'node_id article-data))
-         (authors (query fetch-all st-auth node-id))
-         (content (get-article-content node-id)))
+         (authors (sd:query sd:fetch-all st-auth node-id))
+         (content (%get-article-content node-id)))
     (cons
       (cons 'content content)
       (cons
@@ -649,16 +661,16 @@ SQL
 
 (define (%get-article-comment-ids node-id)
   (let* ((conn (current-connection))
-         (st (sql/transient conn get-article-comment-ids-query)))
-    (query fetch-all st node-id)))
+         (st (sd:sql/transient conn get-article-comment-ids-query)))
+    (sd:query sd:fetch-all st node-id)))
 
 (define (%get-comment-thread node-id #!optional (depth #f))
   (let* ((conn (current-connection))
-         (st-kids (sql conn add-comment-query))
-         (st-content (sql conn get-comment-query)))
+         (st-kids (sd:sql conn add-comment-query))
+         (st-content (sd:sql conn get-comment-query)))
     (let loop ((id node-id))
-      (let* ((content (query fetch-alist st-content id))
-             (kid-ids (query fetch-all st-kids id)))
+      (let* ((content (sd:query sd:fetch-alist st-content id))
+             (kid-ids (sd:query sd:fetch-all st-kids id)))
         (if (null? kid-ids)
           content
           (append content `(children . ,(map loop kid-ids))))))))
@@ -666,7 +678,7 @@ SQL
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 
-(define (instantiate-dbi)
+(define (activate-sqlite)
   (setup-db %setup-db)
   (add-role %add-role)
   (delete-role %delete-role)
@@ -699,7 +711,8 @@ SQL
   (get-article-by-nodeid %get-article-by-nodeid)
   (get-article-by-alias %get-article-by-alias)
   (get-article-comment-ids %get-article-comment-ids)
-  (get-comment-thread %get-comment-thread))
+  (get-comment-thread %get-comment-thread)
+  #t)
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -714,20 +727,4 @@ SQL
 ;;; ========================================================================
 ;;; ------------------------------------------------------------------------
 
-
-
-
-
-
-
-
-) ; END MODULE
-
-;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
-;;; ------------------------------------------------------------------------
-
-;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
-
-;;; ========================================================================
-;;; ------------------------------------------------------------------------
-
+; vim:et:ai:ts=2 sw=2
