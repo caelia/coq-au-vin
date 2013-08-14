@@ -99,6 +99,47 @@
   (and (= (string-length s) 8)
        (string->number (string-append "#x" s))))
 
+(define (words str n)
+  (if (< n 1)
+    '()
+    (with-input-from-string str
+      (lambda ()
+        (let ((return-result
+                (lambda (current-word words-out)
+                  (reverse
+                    (if (null? current-word)
+                      words-out
+                      (cons
+                        (list->string (reverse current-word))
+                        words-out))))))
+          (let loop ((state 'init) (count 1) (chr (read-char)) (current-word '()) (words-out '()))
+            (cond
+              ((eof-object? chr)
+               (return-result current-word words-out))
+              ((char-set-contains? char-set:whitespace chr)
+               (case state
+                 ((init)
+                  (loop 'init count (read-char) '() '()))
+                 ((word)
+                  (if (>= count n)
+                    (return-result current-word words-out)
+                    (loop 'space count (read-char) '() (cons (list->string (reverse current-word)) words-out))))
+                 ((space)
+                  (loop 'space count (read-char) '() words-out))))
+              (else
+                (case state
+                  ((init)
+                   (loop 'word count (read-char) (cons chr current-word) '()))
+                  ((word)
+                   (loop 'word count (read-char) (cons chr current-word) words-out))
+                  ((space)
+                   (loop 'word (+ count 1) (read-char) (list chr) words-out)))))))))))
+
+(define (text->teaser txt #!optional (length #f))
+  (let ((wds (words txt (or length (%default-teaser-length%)))))
+    (string-append (string-join wds " ") " ...")))
+
+
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 
@@ -108,7 +149,9 @@
 
 (define %blog-root% (make-parameter #f))
 
-(define %default-teaser-length% (make-parameter 1024))
+; (define %default-teaser-length% (make-parameter 1024))
+; Should be defined in words
+(define %default-teaser-length% (make-parameter 48))
 
 (define %config% (make-parameter (make-hash-table)))
 
@@ -240,6 +283,9 @@
       tpl-path
       (eprintf "[get-template] Template file '~A' not found." tpl-path))))
 
+; These procedures are probably needed, but currently they use the sql-de-lite
+; API directly, so the DB functionality needs to be abstracted.
+
 ; (define (teaser article-id)
 ;   (or (get-teaser article-id)
 ;       (default-teaser (get-body article-id))))
@@ -275,6 +321,16 @@
          (sanitized-body (escape-html raw-body))
          (html-body (markdown->html sanitized-body)))
     (display html-body out)))
+
+(define (get-article-list/html #!optional (out (current-output-port))
+                               #!key (filters 'latest) (sort '(created desc))
+                               (per-page 10) (show 'teaser))
+  #f)
+
+(define (get-article-list/json #!optional (out (current-output-port))
+                               #!key (filters 'latest) (sort '(created desc))
+                               (per-page 10) (show 'teaser))
+  #f)
 
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
