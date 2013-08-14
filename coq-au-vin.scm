@@ -139,6 +139,22 @@
   (let ((wds (words txt (or length (%default-teaser-length%)))))
     (string-append (string-join wds " ") " ...")))
 
+(define (title->alias title)
+  (with-output-to-string
+    (lambda ()
+      (with-input-from-string title
+        (lambda ()
+          (let loop ((chr (read-char)))
+            (cond
+              ((eof-object? chr) #t)
+              ((char-set-contains? char-set:whitespace chr)
+               (write-char #\-)
+               (loop (read-char)))
+              ((char-set-contains? char-set:punctuation chr)
+               (loop (read-char)))
+              (else
+                (write-char (char-downcase chr))
+                (loop (read-char))))))))))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
