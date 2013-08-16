@@ -12,7 +12,7 @@
         (import ports)
         (import data-structures)
         (import extras)
-        (import srfi-13)
+        ; (import srfi-13)
 
         (import (prefix cav-db db:))
   
@@ -25,7 +25,29 @@
 
         (use spiffy)
         (use intarweb)
-        (use matchable)
+        (use uri-match)
+
+        (use utf8)
+        (use utf8-srfi-13)
+        (use utf8-srfi-14)
+
+
+;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+;;; ----  GLOBAL PARAMETERS  -----------------------------------------------
+
+(define %blog-root% (make-parameter #f))
+
+; (define %default-teaser-length% (make-parameter 1024))
+; Should be defined in words
+(define %default-teaser-length% (make-parameter 64))
+
+(define %config% (make-parameter (make-hash-table)))
+
+(define %session-timeout% (make-parameter 900))
+
+;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+
+
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  UTILITY FUNCTIONS  -----------------------------------------------
@@ -155,23 +177,6 @@
               (else
                 (write-char (char-downcase chr))
                 (loop (read-char))))))))))
-
-;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
-
-
-
-;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
-;;; ----  GLOBAL PARAMETERS  -----------------------------------------------
-
-(define %blog-root% (make-parameter #f))
-
-; (define %default-teaser-length% (make-parameter 1024))
-; Should be defined in words
-(define %default-teaser-length% (make-parameter 48))
-
-(define %config% (make-parameter (make-hash-table)))
-
-(define %session-timeout% (make-parameter 900))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
