@@ -1,4 +1,5 @@
-;;; {DESCRIPTION}
+;;; cav-web.scm -- Abstract web interface module for Coq au Vin.
+;;;
 ;;;   Copyright © 2013 by Matthew C. Gushee <matt@gushee.net>
 ;;;   This program is open-source software, released under the
 ;;;   BSD license. See the accompanying LICENSE file for details.
