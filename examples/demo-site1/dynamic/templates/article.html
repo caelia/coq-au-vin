@@ -63,15 +63,38 @@
   </cvt:block>
   
   <cvt:block name="mainContent">
-    <cvt:if test="seriesTitle">
-      <h4 id="seriesTitle"><cvt:var name="seriesTitle"/><cvt:if test="partNo">, Part <cvt:var name="partNo"/></cvt:if></h4>
+    <cvt:if test="series">
+      <h4 id="seriesTitle"><cvt:var name="series"/><cvt:if test="series_pt">, Part <cvt:var name="series_pt"/></cvt:if></h4>
     </cvt:if>
-    <h3 id="articleTitle"><cvt:var name="articleTitle"/></h3>
-    <cvt:if test="articleSubTitle">
-      <h5 id="articleSubTitle"><cvt:var name="articleSubTitle"/></h5>
+    <h3 id="articleTitle"><cvt:var name="article_title"/></h3>
+    <cvt:if test="subtitle">
+      <h5 id="articleSubTitle"><cvt:var name="subtitle"/></h5>
     </cvt:if>
+    <div id="author-time">
+      <span id="authors">
+        <cvt:if test="author.display_name">
+          <cvt:var name="author.display_name" />
+          <cvt:else>
+            <cvt:var name="author.uname" />
+          </cvt:else>
+        </cvt:if>
+        <cvt:for each="a" in="other_authors" sort="alpha" sort-field="uname">
+          &amp;
+          <cvt:if test="a.display_name">
+            <cvt:var name="a.display_name" />
+            <cvt:else>
+              <cvt:var name="a.uname" />
+            </cvt:else>
+          </cvt:if>
+        </cvt:for>
+      </span>
+      |
+      <span id="created">
+        <cvt:var name="created_dt" />
+      </span>
+    </div>
     <div id="articleBody">
-      <cvt:var name="articleBody"/>
+      <cvt:var name="article_body"/>
     </div>
     <form id="beginEditForm" cvt:action="editURL" method="POST">
       <input id="returnTo" name="returnTo" type="hidden" cvt:value="currentPath" />
@@ -85,7 +108,7 @@
   
   <cvt:block name="footerContent">
     <p class="copyrightNotice">
-      Copyright © <cvt:var name="copyrightYear"/> by <cvt:var name="authorName"/>. <cvt:var name="rightsStatement"/>.
+      Copyright © <cvt:var name="copyright_year"/> by <cvt:var name="copyright_holders"/>. <cvt:var name="rights_statement"/>.
     </p>
   </cvt:block>
 </cvt:template>
