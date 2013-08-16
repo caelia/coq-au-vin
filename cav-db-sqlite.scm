@@ -100,6 +100,8 @@ CREATE TABLE articles (
     modified_dt INTEGER,
     version TEXT,
     teaser_len INTEGER,
+    sticky INTEGER DEFAULT 0,
+    sticky_until INTEGER,
     alias TEXT
 );
 SQL
@@ -559,7 +561,7 @@ SQL
 
 (define get-article-by-nodeid-query
 #<<SQL
-SELECT title, series, series_pt, subtitle, created_dt, teaser_len
+SELECT title, series, series_pt, subtitle, created_dt, teaser_len, sticky, sticky_until
 FROM articles
 WHERE node_id = ?;
 SQL
@@ -567,7 +569,7 @@ SQL
 
 (define get-article-by-alias-query
 #<<SQL
-SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len
+SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len, sticky, sticky_until
 FROM articles
 WHERE alias = ?;
 SQL
@@ -637,7 +639,7 @@ SQL
          (st-data (sd:sql/transient conn get-article-by-nodeid-query))
          (st-auth (sd:sql/transient conn get-article-authors-query))
          (article-data (sd:query sd:fetch-alist st-data node-id))
-         (authors (sd:query sd:fetch st-auth node-id))
+         (authors (sd:query sd:fetch-alists st-auth node-id))
          (content (%get-article-content node-id)))
     (cons
       (cons 'content content)
