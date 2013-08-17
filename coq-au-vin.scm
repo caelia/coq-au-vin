@@ -1,4 +1,5 @@
 ;;; coq-au-vin.scm -- A simple blogging platform based on Chicken Scheme.
+;;;
 ;;;   Copyright © 2013 by Matthew C. Gushee <matt@gushee.net>
 ;;;   This program is open-source software, released under the
 ;;;   BSD license. See the accompanying LICENSE file for details.
@@ -333,15 +334,42 @@
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; --  WEB INTERFACE  -----------------------------------------------------
 
+(define (get-article-data id/alias)
+  (if (node-id? id/alias)
+    ((db:get-article-by-nodeid) id/alias)
+    ((db:get-article-by-alias) id/alias)))
+
+(define (process-body article-data)
+  (let* ((raw-body (alist-ref 'body (alist-ref 'content article-data)))
+         (sanitized-body (escape-html raw-body)))
+    (markdown->html sanitized-body)))
+
 (define (get-article/html id/alias #!optional (out (current-output-port)))
-  (let* ((article-data
-          (if (node-id? id/alias)
-            ((db:get-article-by-nodeid) id/alias)
-            ((db:get-article-by-alias) id/alias)))
-         (raw-body (alist-ref 'body (alist-ref 'content article-data)))
-         (sanitized-body (escape-html raw-body))
-         (html-body (markdown->html sanitized-body)))
+  (let* ((article-data (get-article-data id/alias))
+         (html-body (process-body article-data)))
     (display html-body out)))
+
+(define (get-article/json id/alias #!optional (out (current-output-port)))
+  #f)
+
+(define (get-article-page/html id/alias #!optional (out (current-output-port)))
+  (let* ((article-data (get-article-data id/alias))
+         (html-body (process-body article-data))
+         (vars
+           (foldl
+             (lambda (prev pair)
+               (let ((key (car pair))
+                     (val (cdr pair)))
+                 (case key
+                   ((authors)
+                    (let* ((first (car val))
+                           (others (cdr val))
+                           (result* (cons (cons 'author first) prev)))
+                      (if (null? others)
+                        result*
+                        (cons (cons 'other_authors others) result*))))
+
+
 
 (define (get-article-list/html #!optional (out (current-output-port))
                                #!key (filters 'latest) (sort '(created desc))
