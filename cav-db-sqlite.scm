@@ -587,10 +587,10 @@ SQL
 
 (define get-article-tags-query
 #<<SQL
-SELECT tag FROM tags
-WHERE tags(id) = articles_x_tags(tag)
-AND articles_x_tags(article) = articles(id)
-AND articles(node_id) = ?;
+SELECT tags.tag FROM tags, articles_x_tags, articles
+WHERE tags.id = articles_x_tags.tag
+AND articles_x_tags.article = articles.id
+AND articles.node_id = ?;
 SQL
 )
 
@@ -638,28 +638,36 @@ SQL
   (let* ((conn (current-connection))
          (st-data (sd:sql/transient conn get-article-by-nodeid-query))
          (st-auth (sd:sql/transient conn get-article-authors-query))
+         (st-tags (sd:sql/transient conn get-article-tags-query))
          (article-data (sd:query sd:fetch-alist st-data node-id))
          (authors (sd:query sd:fetch-alists st-auth node-id))
+         (tags (sd:query sd:fetch-all st-tags node-id))
          (content (%get-article-content node-id)))
     (cons
       (cons 'content content)
       (cons
         (cons 'authors authors)
-        article-data))))
+        (cons
+          (cons 'tags (flatten tags))
+          article-data)))))
 
 (define (%get-article-by-alias alias)
   (let* ((conn (current-connection))
          (st-data (sd:sql/transient conn get-article-by-alias-query))
          (st-auth (sd:sql/transient conn get-article-authors-query))
+         (st-tags (sd:sql/transient conn get-article-tags-query))
          (article-data (sd:query sd:fetch-alist st-data alias))
          (node-id (alist-ref 'node_id article-data))
          (authors (sd:query sd:fetch-all st-auth node-id))
+         (tags (sd:query sd:fetch-all st-tags node-id))
          (content (%get-article-content node-id)))
     (cons
       (cons 'content content)
       (cons
         (cons 'authors authors)
-        article-data))))
+        (cons
+          (cons 'tags (flatten tags))
+          article-data)))))
 
 (define (%get-article-comment-ids node-id)
   (let* ((conn (current-connection))
