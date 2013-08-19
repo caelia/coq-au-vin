@@ -13,6 +13,8 @@
         (import ports)
         (import data-structures)
         (import extras)
+        (import posix)
+        (import srfi-1)
         ; (import srfi-13)
 
         (import (prefix cav-db db:))
@@ -45,6 +47,8 @@
 (define %config% (make-parameter (make-hash-table)))
 
 (define %session-timeout% (make-parameter 900))
+
+(define %default-date-format% (make-parameter #f))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -342,7 +346,9 @@
 (define (process-body article-data)
   (let* ((raw-body (alist-ref 'body (alist-ref 'content article-data)))
          (sanitized-body (escape-html raw-body)))
-    (markdown->html sanitized-body)))
+;     (with-output-to-string
+;       (lambda () (markdown->html sanitized-body)))))
+    (markdown->sxml sanitized-body)))
 
 (define (get-article/html id/alias #!optional (out (current-output-port)))
   (let* ((article-data (get-article-data id/alias))
@@ -352,9 +358,10 @@
 (define (get-article/json id/alias #!optional (out (current-output-port)))
   #f)
 
-(define (get-article-page/html id/alias #!optional (out (current-output-port)))
+(define (get-article-page/html id/alias #!optional (out (current-output-port))
+                               #!key (date-format #f))
   (let* ((article-data (get-article-data id/alias))
-         (html-body (process-body article-data))
+         ; (html-body (process-body article-data))
          (vars
            (foldl
              (lambda (prev pair)
@@ -368,7 +375,28 @@
                       (if (null? others)
                         result*
                         (cons (cons 'other_authors others) result*))))
+                   ((created_dt)
+                    (let* ((fmt (or date-format (%default-date-format%)))
+                           (dtstring (time->string (seconds->local-time val) date-format)))
+                      (cons (cons 'created_dt dtstring) prev)))
+                   ((title)
+                    (cons (cons 'article_title val) prev))
+                   ((content)
+                    (cons (cons 'article_body (process-body article-data)) prev))
+                   (else
+                     (let ((res (if (null? val) (cons key "") pair)))
+                       (cons res prev))))))
 
+             '()
+             article-data))
+         ;;; TEMPORARY!
+         (extra-vars
+            `((urlScheme . "http") (hostName . "quahog") (articleID . ,id/alias) (bodyMD . "")
+              (canEdit . #t) (copyright_year . 2013) (copyright_holders . "Madeleine C St Clair")
+              (rights_statement . "You have no rights") (htmlTitle . "Civet Page!") (bodyClasses . "")))
+         (vars* (append extra-vars vars))
+         (ctx (cvt:make-context vars: vars*)))
+    (cvt:render "article.html" ctx port: out)))
 
 
 (define (get-article-list/html #!optional (out (current-output-port))
@@ -381,6 +409,17 @@
                                (per-page 10) (show 'teaser))
   #f)
 
+
+;; This is temporary!
+; (define (init)
+;   (activate-sqlite)
+;   (db:dbfile "examples/demo-site1/data/preloaded.db")
+;   (db:current-connection (open-database "examples/demo-site1/data/preloaded.db"))
+;   (db:content-path "examples/demo-site1/data/content")
+;   (cvt:*site-path* "examples/demo-site1/dynamic"))
+; 
+; (define (shut-it)
+;   (close-database (db:current-connection)))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
