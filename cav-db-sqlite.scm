@@ -614,6 +614,35 @@ SQL
 (define get-comment-query
   "SELECT author, created_dt, text WHERE node_id = ?;")
 
+(define get-articles-all-query
+#<<SQL
+SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len, sticky, sticky_until
+FROM articles
+ORDER BY created_dt DESC
+OFFSET ? LIMIT ?;
+SQL
+)
+
+(define get-articles-by-tag-query
+#<<SQL
+SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len, sticky, sticky_until
+FROM articles, articles_x_tags, tags
+WHERE articles_x_tags.article = articles.id AND articles_x_tags.tag = tags.id AND tags.tag = ?
+ORDER BY created_dt DESC
+OFFSET ? LIMIT ?;
+SQL
+)
+
+(define get-articles-by-author-query
+#<<SQL
+SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len, sticky, sticky_until
+FROM articles, articles_x_tags, tags
+WHERE articles_x_authors.article = articles.id AND articles_x_authors = users.id AND users.uname = ?
+ORDER BY created_dt DESC
+OFFSET ? LIMIT ?;
+SQL
+)
+
 ;;; ========================================================================
 ;;; ------  Functions  -----------------------------------------------------
 
