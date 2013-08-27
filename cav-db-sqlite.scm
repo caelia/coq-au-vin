@@ -614,12 +614,29 @@ SQL
 (define get-comment-query
   "SELECT author, created_dt, text WHERE node_id = ?;")
 
+(define get-article-count-query
+  "SELECT count(*) FROM articles;")
+
+(define get-article-with-tag-count-query
+#<<SQL
+SELECT count(*) FROM articles, articles_x_tags, tags
+WHERE articles_x_tags.article = articles.id AND articles_x_tags.tag = tags.id AND tags.tag = ?
+SQL
+)
+
+(define get-article-by-author-count-query
+#<<SQL
+SELECT count(*) FROM articles, articles_x_authors, users
+WHERE articles_x_authors.article = articles.id AND articles_x_authors = users.id AND users.uname = ?
+SQL
+)
+
 (define get-articles-all-query
 #<<SQL
 SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len, sticky, sticky_until
 FROM articles
 ORDER BY created_dt DESC
-OFFSET ? LIMIT ?;
+LIMIT ? OFFSET ?;
 SQL
 )
 
@@ -629,7 +646,7 @@ SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len, stic
 FROM articles, articles_x_tags, tags
 WHERE articles_x_tags.article = articles.id AND articles_x_tags.tag = tags.id AND tags.tag = ?
 ORDER BY created_dt DESC
-OFFSET ? LIMIT ?;
+LIMIT ? OFFSET ?;
 SQL
 )
 
@@ -639,7 +656,7 @@ SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len, stic
 FROM articles, articles_x_tags, tags
 WHERE articles_x_authors.article = articles.id AND articles_x_authors = users.id AND users.uname = ?
 ORDER BY created_dt DESC
-OFFSET ? LIMIT ?;
+LIMIT ? OFFSET ?;
 SQL
 )
 
@@ -713,6 +730,22 @@ SQL
         (if (null? kid-ids)
           content
           (append content `(children . ,(map loop kid-ids))))))))
+
+(define (get-article-count #!key (tag #f) (author #f))
+  (let-values (((param qstring)
+                (cond
+                  (tag (values tag get-article-with-tag-count-query))
+                  (author (values author get-article-by-author-count-query))
+                  (else (values #f get-article-count-query)))))
+    (let* ((conn (current-connection))
+           (st (sd:sql/transient conn qstring)))
+      (if param
+        (sd:query sd:fetch st param)
+        (sd:query sd:fetch st)))))
+
+(define (%get-articles #!optional (offset 0) (limit 10)
+                       #!key (tag #f) (author #f))
+  (let ((count (get-article-count tag: tag author: author))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
