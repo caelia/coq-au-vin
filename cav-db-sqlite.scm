@@ -640,7 +640,7 @@ LIMIT ? OFFSET ?;
 SQL
 )
 
-(define get-articles-by-tag-query
+(define get-articles-with-tag-query
 #<<SQL
 SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len, sticky, sticky_until
 FROM articles, articles_x_tags, tags
@@ -704,7 +704,7 @@ SQL
          (st-tags (sd:sql/transient conn get-article-tags-query))
          (article-data (sd:query sd:fetch-alist st-data alias))
          (node-id (alist-ref 'node_id article-data))
-         (authors (sd:query sd:fetch-all st-auth node-id))
+         (authors (sd:query sd:fetch-alists st-auth node-id))
          (tags (sd:query sd:fetch-all st-tags node-id))
          (content (%get-article-content node-id)))
     (cons
@@ -731,21 +731,60 @@ SQL
           content
           (append content `(children . ,(map loop kid-ids))))))))
 
-(define (get-article-count #!key (tag #f) (author #f))
-  (let-values (((param qstring)
-                (cond
-                  (tag (values tag get-article-with-tag-count-query))
-                  (author (values author get-article-by-author-count-query))
-                  (else (values #f get-article-count-query)))))
-    (let* ((conn (current-connection))
-           (st (sd:sql/transient conn qstring)))
-      (if param
-        (sd:query sd:fetch st param)
-        (sd:query sd:fetch st)))))
-
-(define (%get-articles #!optional (offset 0) (limit 10)
+(define (%get-articles #!optional (offset 0) (limit 10) (mk-teaser identity)
                        #!key (tag #f) (author #f))
-  (let ((count (get-article-count tag: tag author: author))
+  (let-values (((param qcount qdata)
+                (cond
+                  (tag (values tag get-article-with-tag-count-query get-articles-with-tag-query))
+                  (author (values author get-article-by-author-count-query get-articles-by-author-query))
+                  (else (values #f get-article-count-query get-articles-all-query)))))
+    (let* ((conn (current-connection))
+           (st-count (sd:sql/transient conn qcount))
+           (st-data (sd:sql/transient conn qdata))
+           (st-auth (sd:sql conn get-article-authors-query))
+           (st-tags (sd:sql conn get-article-tags-query))
+           (count
+             (car
+               (if param
+                 (sd:query sd:fetch st-count param)
+                 (sd:query sd:fetch st-count))))
+           (data*
+             (if param
+               (sd:query sd:fetch-alists st-data param)
+               (sd:query sd:fetch-alists st-data)))
+;           (process-content
+;             (lambda (cont)
+;               (map
+;                 (lambda (pair)
+;                   (if (eqv? (car pair) 'body)
+;                     (cons 'teaser (mk-teaser (cdr pair)))
+;                     pair))))))
+           ;; FIXME -- hmmm ... probably want to enable add additional stuff for
+           ;; the future.
+           (process-content
+             (lambda (cont)
+               (cons 'teaser (mk-teaser (alist-ref 'body cont))))))
+      (let loop ((data-in data*)
+                 (data-out '()))
+        (if (null? data-in)
+          (values count (reverse data-out))
+          (let* ((datum (car data-in))
+                 (node-id (alist-ref 'node_id datum))
+                 (authors (sd:query sd:fetch-alists st-auth))
+                 (tags (sd:query sd:fetch-all st-tags))
+                 (content (%get-article-content node-id)))
+            (loop
+              (cdr data-in)
+              (cons
+                (cons
+                  (cons 'authors authors)
+                  (cons
+                    (cons 'tags (flatten tags))
+                    (cons
+                      (process-content content)
+                      datum)))
+                data-out))))))))
+
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -784,6 +823,7 @@ SQL
   (get-article-by-alias %get-article-by-alias)
   (get-article-comment-ids %get-article-comment-ids)
   (get-comment-thread %get-comment-thread)
+  (get-articles %get-articles)
   #t)
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
