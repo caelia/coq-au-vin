@@ -78,15 +78,17 @@
             <cvt:var name="author.uname" />
           </cvt:else>
         </cvt:if>
-        <cvt:for each="a" in="other_authors" sort="alpha" sort-field="uname">
-          &amp;
-          <cvt:if test="a.display_name">
-            <cvt:var name="a.display_name" />
-            <cvt:else>
-              <cvt:var name="a.uname" />
-            </cvt:else>
-          </cvt:if>
-        </cvt:for>
+        <cvt:if test="other_authors">
+          <cvt:for each="a" in="other_authors" sort="alpha" sort-field="uname">
+            &amp;
+            <cvt:if test="a.display_name">
+              <cvt:var name="a.display_name" />
+              <cvt:else>
+                <cvt:var name="a.uname" />
+              </cvt:else>
+            </cvt:if>
+          </cvt:for>
+        </cvt:if>
       </span>
       |
       <span id="created">
@@ -95,6 +97,18 @@
     </div>
     <div id="articleBody">
       <cvt:var name="article_body"/>
+    </div>
+    <div id="articleTags">
+      <strong>Tags:</strong>
+      <cvt:for each="tag" in="tags" sort="alpha">
+        <cvt:with>
+          <cvt:defvar name="tag_url">http://this.site/tag/<cvt:var name="tag"/></cvt:defvar>
+          <a>
+            <cvt:attr name="href"><cvt:var name="tag_url"/></cvt:attr>
+            <cvt:var name="tag"/>
+          </a>
+        </cvt:with>
+      </cvt:for>
     </div>
     <form id="beginEditForm" cvt:action="editURL" method="POST">
       <input id="returnTo" name="returnTo" type="hidden" cvt:value="currentPath" />

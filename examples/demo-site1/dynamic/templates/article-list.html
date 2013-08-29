@@ -64,49 +64,47 @@
   
   <cvt:block name="mainContent">
     <cvt:for each="article" in="articles" sort="numeric" sort-field="raw_dt" order="desc">
-      <cvt:if test="series">
-        <h4 id="seriesTitle"><cvt:var name="series"/><cvt:if test="series_pt">, Part <cvt:var name="series_pt"/></cvt:if></h4>
+      <cvt:if test="article.series">
+        <h4 id="seriesTitle"><cvt:var name="article.series"/><cvt:if test="article.series_pt">, Part <cvt:var name="article.series_pt"/></cvt:if></h4>
       </cvt:if>
-      <h3 id="articleTitle"><cvt:var name="article_title"/></h3>
+      <h3 id="articleTitle"><cvt:var name="article.article_title"/></h3>
       <cvt:if test="subtitle">
-        <h5 id="articleSubTitle"><cvt:var name="subtitle"/></h5>
+        <h5 id="articleSubTitle"><cvt:var name="article.subtitle"/></h5>
       </cvt:if>
       <div id="author-time">
         <span id="authors">
-          <cvt:if test="author.display_name">
-            <cvt:var name="author.display_name" />
+          <cvt:if test="article.author.display_name">
+            <cvt:var name="article.author.display_name" />
             <cvt:else>
-              <cvt:var name="author.uname" />
+              <cvt:var name="article.author.uname" />
             </cvt:else>
           </cvt:if>
-          <cvt:for each="a" in="other_authors" sort="alpha" sort-field="uname">
-            &amp;
-            <cvt:if test="a.display_name">
-              <cvt:var name="a.display_name" />
-              <cvt:else>
-                <cvt:var name="a.uname" />
-              </cvt:else>
-            </cvt:if>
-          </cvt:for>
+          <cvt:if test="article.other_authors">
+            <cvt:for each="a" in="article.other_authors" sort="alpha" sort-field="uname">
+              &amp;
+              <cvt:if test="a.display_name">
+                <cvt:var name="a.display_name" />
+                <cvt:else>
+                  <cvt:var name="a.uname" />
+                </cvt:else>
+              </cvt:if>
+            </cvt:for>
+          </cvt:if>
         </span>
         |
         <span id="created">
-          <cvt:var name="created_dt" />
+          <cvt:var name="article.created_dt" />
         </span>
       </div>
       <div id="teaser">
-        <cvt:var name="teaser"/>
+        <cvt:var name="article.teaser"/>
         <a>  
           <cvt:attr name="href">
-            <cvt:var name="contentPath"/><cvt:var name="node_id"/>
+            <cvt:var name="contentPath"/><cvt:var name="article.node_id"/>
           </cvt:attr>
           MORE
         </a>
       </div>
-      <form id="beginEditForm" cvt:action="editURL" method="POST">
-        <input id="returnTo" name="returnTo" type="hidden" cvt:value="currentPath" />
-        <button id="editButton" name="editButton" type="submit">Edit</button>
-      </form>
     </cvt:for>
   </cvt:block>
   
