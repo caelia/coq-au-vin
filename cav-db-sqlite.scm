@@ -8,7 +8,8 @@
 (load "cav-db.so")
 
 (module cav-db-sqlite
-        (activate-sqlite open-database close-database)
+        *
+        ; (activate-sqlite open-database close-database)
 
         (import scheme chicken)
         (import extras)
@@ -39,6 +40,48 @@
 (define open-database sd:open-database)
 (define close-database sd:close-database)
 
+(define (falsify alist)
+  (map
+    (lambda (pair)
+      (let ((key (car pair))
+            (val (cdr pair)))
+        (cond
+          ((null? val) `(,key . #f))
+          ((list? val) `(,key . ,(falsify val)))
+          (else pair))))
+    alist))
+
+; (define (falsify alist)
+;   (let ((falsified
+;           (map
+;             (lambda (pair)
+;               (let ((key (car pair))
+;                     (val (cdr pair)))
+;                 (cond
+;                   ((null? val) `(,key . #f))
+;                   ((list? val) `(,key . ,(falsify val)))
+;                   (else pair))))
+;             alist)))
+;     (with-output-to-file
+;       "falsify.log"
+;       (lambda ()
+;         (print "ORIG:")
+;         (pp alist)
+;         (print "FALSIFIED:")
+;         (pp falsified)))
+;     falsified))
+
+(define (cull-null alist)
+  (foldl
+    (lambda (prev pair)
+      (let ((key (car pair))
+            (val (cdr pair)))
+        (cond
+          ((null? val) prev)
+          ((list? val) (cons `(,key . ,(cull-null val)) prev))
+          (else (cons pair prev)))))
+    '()
+    alist))
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  INITIAL SETUP  ---------------------------------------------------
 
@@ -467,8 +510,8 @@ SQL
 ;;; ------  Functions  -----------------------------------------------------
 
 (define (%create-article node-id title author/s
-                        #!key (series '()) (series-pt '()) (subtitle '())
-                        (teaser-len '()) (alias '()) (tags '()) (categories '()))
+                         #!key (series '()) (series-pt '()) (subtitle '())
+                         (teaser-len '()) (alias '()) (tags '()) (categories '()))
   (let* ((authors (if (list? author/s) author/s (list author/s)))
          (conn (current-connection))
          (st-art (sd:sql/transient conn create-article-query))
@@ -561,7 +604,7 @@ SQL
 
 (define get-article-by-nodeid-query
 #<<SQL
-SELECT title, series, series_pt, subtitle, created_dt, teaser_len, sticky, sticky_until
+SELECT title, subtitle, created_dt, teaser_len, sticky, sticky_until
 FROM articles
 WHERE node_id = ?;
 SQL
@@ -569,9 +612,17 @@ SQL
 
 (define get-article-by-alias-query
 #<<SQL
-SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len, sticky, sticky_until
+SELECT node_id, title, subtitle, created_dt, teaser_len, sticky, sticky_until
 FROM articles
 WHERE alias = ?;
+SQL
+)
+
+(define get-article-series-query
+#<<SQL
+SELECT series.title as series, series_pt
+FROM articles, series
+WHERE node_id = ? AND series.id = articles.series;
 SQL
 )
 
@@ -680,40 +731,42 @@ SQL
   (let ((article-path (make-pathname (content-path) node-id))) 
     `((body . ,(%get-article-body article-path)))))
 
-(define (%get-article-by-nodeid node-id)
-  (let* ((conn (current-connection))
-         (st-data (sd:sql/transient conn get-article-by-nodeid-query))
+(define (%get-article-common-data conn node-id)
+  (let* ((st-series (sd:sql/transient conn get-article-series-query))
          (st-auth (sd:sql/transient conn get-article-authors-query))
          (st-tags (sd:sql/transient conn get-article-tags-query))
-         (article-data (sd:query sd:fetch-alist st-data node-id))
+         (series (sd:query sd:fetch-alist st-series node-id))
          (authors (sd:query sd:fetch-alists st-auth node-id))
          (tags (sd:query sd:fetch-all st-tags node-id))
          (content (%get-article-content node-id)))
-    (cons
-      (cons 'content content)
-      (cons
-        (cons 'authors authors)
-        (cons
-          (cons 'tags (flatten tags))
-          article-data)))))
+    (append
+      `((content . ,content)
+        ;(authors . ,authors)
+        (authors . ,(falsify authors))
+        ;(authors . ,(cull-null authors))
+        (tags . ,(flatten tags)))
+      series)))
+
+(define (%get-article-by-nodeid node-id)
+  (let* ((conn (current-connection))
+         (st-data (sd:sql/transient conn get-article-by-nodeid-query))
+         (article-data (sd:query sd:fetch-alist st-data node-id)))
+    (append
+      ;article-data
+      (falsify article-data)
+      ;(cull-null article-data)
+      (%get-article-common-data conn node-id))))
 
 (define (%get-article-by-alias alias)
   (let* ((conn (current-connection))
          (st-data (sd:sql/transient conn get-article-by-alias-query))
-         (st-auth (sd:sql/transient conn get-article-authors-query))
-         (st-tags (sd:sql/transient conn get-article-tags-query))
          (article-data (sd:query sd:fetch-alist st-data alias))
-         (node-id (alist-ref 'node_id article-data))
-         (authors (sd:query sd:fetch-alists st-auth node-id))
-         (tags (sd:query sd:fetch-all st-tags node-id))
-         (content (%get-article-content node-id)))
-    (cons
-      (cons 'content content)
-      (cons
-        (cons 'authors authors)
-        (cons
-          (cons 'tags (flatten tags))
-          article-data)))))
+         (node-id (alist-ref 'node_id article-data)))
+    (append
+      ;article-data
+      (falsify article-data)
+      ;(cull-null article-data)
+      (%get-article-common-data conn node-id))))
 
 (define (%get-article-comment-ids node-id)
   (let* ((conn (current-connection))
@@ -731,8 +784,8 @@ SQL
           content
           (append content `(children . ,(map loop kid-ids))))))))
 
-(define (%get-articles #!optional (offset 0) (limit 10) (mk-teaser identity)
-                       #!key (tag #f) (author #f))
+(define (%get-articles #!key (limit 10) (offset 0) (mk-teaser identity)
+                       (tag #f) (author #f))
   (let-values (((param qcount qdata)
                 (cond
                   (tag (values tag get-article-with-tag-count-query get-articles-with-tag-query))
@@ -750,8 +803,8 @@ SQL
                  (sd:query sd:fetch st-count))))
            (data*
              (if param
-               (sd:query sd:fetch-alists st-data param)
-               (sd:query sd:fetch-alists st-data)))
+               (sd:query sd:fetch-alists st-data param limit offset)
+               (sd:query sd:fetch-alists st-data limit offset)))
 ;           (process-content
 ;             (lambda (cont)
 ;               (map
@@ -770,19 +823,23 @@ SQL
           (values count (reverse data-out))
           (let* ((datum (car data-in))
                  (node-id (alist-ref 'node_id datum))
-                 (authors (sd:query sd:fetch-alists st-auth))
-                 (tags (sd:query sd:fetch-all st-tags))
+                 (authors (sd:query sd:fetch-alists st-auth node-id))
+                 (tags (sd:query sd:fetch-all st-tags node-id))
                  (content (%get-article-content node-id)))
             (loop
               (cdr data-in)
               (cons
                 (cons
-                  (cons 'authors authors)
+                  ;(cons 'authors authors)
+                  (cons 'authors (falsify authors))
+                  ;(cons 'authors (cull-null authors))
                   (cons
                     (cons 'tags (flatten tags))
                     (cons
                       (process-content content)
-                      datum)))
+                      ;datum)))
+                      (falsify datum))))
+                      ;(cull-null datum))))
                 data-out))))))))
 
 
