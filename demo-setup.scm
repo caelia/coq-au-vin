@@ -20,44 +20,68 @@
 (define date-format #f)
 (define %default-date-format% (make-parameter #f))
 
-(define (get-sxml id/alias)
+(define (prepare-article-vars article-data)
+  (foldl
+    (lambda (prev pair)
+      (let ((key (car pair))
+            (val (cdr pair)))
+        (case key
+          ((authors)
+           (let* ((first (car val))
+                  (others (cdr val))
+                  (result* (cons (cons 'author first) prev)))
+             (if (null? others)
+               result*
+               (cons (cons 'other_authors others) result*))))
+          ((created_dt)
+           (let* ((fmt (or date-format (%default-date-format%)))
+                  (dtstring (time->string (seconds->local-time val) date-format)))
+             (cons
+               (cons 'created_dt dtstring)
+               (cons
+                 (cons 'raw_dt val)
+                 prev))))
+          ((title)
+           (cons (cons 'article_title val) prev))
+          ((content)
+           (cons (cons 'article_body (process-body article-data)) prev))
+          (else
+            (let ((res (if (null? val) (cons key "") pair)))
+              (cons res prev))))))
+
+    '()
+    article-data))
+
+(define (get-page-vars #!optional (id/alias #f))
+  (let ((common-vars
+          '((jquerySrc . "/scripts/jquery.js") (urlScheme . "http") (hostName . "quahog")  (bodyMD . "")
+            (canEdit . #t) (copyright_year . 2013) (copyright_holders . "Madeleine C St Clair")
+            (rights_statement . "You have no rights") (htmlTitle . "Civet Page!") (bodyClasses . ""))))
+    (if id/alias
+      (cons `(articleID . ,id/alias) common-vars)
+      common-vars)))
+
+(define (get-article-ctx id/alias)
   (let* ((article-data (get-article-data id/alias))
          ; (html-body (process-body article-data))
-         (vars
-           (foldl
-             (lambda (prev pair)
-               (let ((key (car pair))
-                     (val (cdr pair)))
-                 (case key
-                   ((authors)
-                    (let* ((first (car val))
-                           (others (cdr val))
-                           (result* (cons (cons 'author first) prev)))
-                      (if (null? others)
-                        result*
-                        (cons (cons 'other_authors others) result*))))
-                   ((created_dt)
-                    (let* ((fmt (or date-format (%default-date-format%)))
-                           (dtstring (time->string (seconds->local-time val) date-format)))
-                      (cons (cons 'created_dt dtstring) prev)))
-                   ((title)
-                    (cons (cons 'article_title val) prev))
-                   ((content)
-                    (cons (cons 'article_body (process-body article-data)) prev))
-                   (else
-                     (let ((res (if (null? val) (cons key "") pair)))
-                       (cons res prev))))))
-
-             '()
-             article-data))
+         (vars (prepare-article-vars article-data))
          ;;; TEMPORARY!
-         (extra-vars
-            `((urlScheme . "http") (hostName . "quahog") (articleID . ,id/alias) (bodyMD . "")
-              (canEdit . #t) (copyright_year . 2013) (copyright_holders . "Madeleine C St Clair")
-              (rights_statement . "You have no rights") (htmlTitle . "Civet Page!") (bodyClasses . "")))
-         (vars* (append extra-vars vars))
-         (ctx (cvt:make-context vars: vars*)))
-    (cvt:process-template-set "article.html" ctx)))
+         (page-vars (get-page-vars id/alias))
+         (vars* (append page-vars vars)))
+    (cvt:make-context vars: vars*)))
+
+(define (get-article-sxml ctx)
+  (cvt:process-template-set "article.html" ctx))
+
+(define (get-article-list-ctx #!key (tag #f) (author #f))
+  (let-values (((count list-data) ((db:get-articles) mk-teaser: text->teaser tag: tag author: author)))
+    (let* ((list-vars (map prepare-article-vars list-data))
+           (page-vars (get-page-vars))
+           (vars* (cons (cons 'articles list-vars) page-vars)))
+      (cvt:make-context vars: vars*))))
+
+(define (get-article-list-sxml ctx)
+  (cvt:process-template-set "article-list.html" ctx))
 
 (define conversion-rules
   `((*text* . ,(lambda (tag body)
@@ -70,10 +94,5 @@
       (SRV:send-reply (pre-post-order* tree conversion-rules)))))
 
 (define (write-html tree file)
-  (with-output-to-file file
-    (lambda ()
-      (SRV:send-reply (pre-post-order* tree conversion-rules)))))
-
-(define (write-html2 tree file)
   (with-output-to-file file
     (lambda () (serialize-sxml tree output: (current-output-port)))))
