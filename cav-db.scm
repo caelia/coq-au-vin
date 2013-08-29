@@ -116,6 +116,8 @@
 
 (define get-comment-thread (make-parameter #f))
 
+(define get-articles (make-parameter #f))
+
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 
