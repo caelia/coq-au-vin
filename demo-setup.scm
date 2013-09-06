@@ -20,6 +20,10 @@
 (define date-format #f)
 (define %default-date-format% (make-parameter #f))
 
+(define %current-articles% (make-parameter '()))
+(define (add-article id)
+  (%current-articles% (reverse (cons id (%current-articles%)))))
+
 (define (prepare-article-vars article-data)
   (foldl
     (lambda (prev pair)
@@ -27,12 +31,7 @@
             (val (cdr pair)))
         (case key
           ((authors)
-           (let* ((first (car val))
-                  (others (cdr val))
-                  (result* (cons (cons 'author first) prev)))
-             (if (null? others)
-               result*
-               (cons (cons 'other_authors others) result*))))
+           (cons (cons 'authors val) prev))
           ((created_dt)
            (let* ((fmt (or date-format (%default-date-format%)))
                   (dtstring (time->string (seconds->local-time val) date-format)))
@@ -63,7 +62,7 @@
 
 (define (get-article-ctx id/alias)
   (let* ((article-data (get-article-data id/alias))
-         ; (html-body (process-body article-data))
+         ; (html-body (process-body article-data)))
          (vars (prepare-article-vars article-data))
          ;;; TEMPORARY!
          (page-vars (get-page-vars id/alias))
@@ -75,6 +74,11 @@
 
 (define (get-article-list-ctx #!key (tag #f) (author #f))
   (let-values (((count list-data) ((db:get-articles) mk-teaser: text->teaser tag: tag author: author)))
+    (for-each
+      (lambda (datum)
+        (let ((id (alist-ref 'node_id datum)))
+          (add-article id)))
+      list-data)
     (let* ((list-vars (map prepare-article-vars list-data))
            (page-vars (get-page-vars))
            (vars* (cons (cons 'articles list-vars) page-vars)))

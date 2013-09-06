@@ -1,6 +1,6 @@
 <cvt:template
     xmlns="http://www.w3.org/1999/xhtml"
-    xmlns:cvt="http://xmlns.therebetygers.net/civet/0.1"
+    xmlns:cvt="http://xmlns.therebetygers.net/civet/0.2"
     extends="base.html">
 
   <cvt:head>
@@ -72,23 +72,17 @@
     </cvt:if>
     <div id="author-time">
       <span id="authors">
-        <cvt:if test="author.display_name">
-          <cvt:var name="author.display_name" />
-          <cvt:else>
-            <cvt:var name="author.uname" />
-          </cvt:else>
-        </cvt:if>
-        <cvt:if test="other_authors">
-          <cvt:for each="a" in="other_authors" sort="alpha" sort-field="uname">
-            &amp;
-            <cvt:if test="a.display_name">
-              <cvt:var name="a.display_name" />
-              <cvt:else>
-                <cvt:var name="a.uname" />
-              </cvt:else>
-            </cvt:if>
-          </cvt:for>
-        </cvt:if>
+        <cvt:for each="awthur" in="authors" sort="alpha" sort-field="uname">
+          <cvt:interpolate mode="pair">&amp; </cvt:interpolate>
+          <cvt:interpolate mode="last">, &amp; </cvt:interpolate>
+          <cvt:interpolate>, </cvt:interpolate>
+          <cvt:if test="awthur.display_name">
+            <cvt:var name="awthur.display_name" />
+            <cvt:else>
+              <cvt:var name="awthur.uname" />
+            </cvt:else>
+          </cvt:if>
+        </cvt:for>
       </span>
       |
       <span id="created">
@@ -102,9 +96,8 @@
       <strong>Tags:</strong>
       <cvt:for each="tag" in="tags" sort="alpha">
         <cvt:with>
-          <cvt:defvar name="tag_url">http://this.site/tag/<cvt:var name="tag"/></cvt:defvar>
-          <a>
-            <cvt:attr name="href"><cvt:var name="tag_url"/></cvt:attr>
+          <cvt:defvar name="tag_url">http://this.site/tag/<cvt:var name="tag" format="uri"/></cvt:defvar>
+          <a cvt:href="tag_url">
             <cvt:var name="tag"/>
           </a>
         </cvt:with>

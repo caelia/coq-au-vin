@@ -4,7 +4,8 @@
 ;;;   This program is open-source software, released under the
 ;;;   BSD license. See the accompanying LICENSE file for details.
 
-(require-library cav-db)
+(load "./cav-db.so")
+;(require-library cav-db)
 
 (module coq-au-vin
         *
