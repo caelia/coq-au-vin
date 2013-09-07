@@ -1,0 +1,6 @@
+((license "BSD")
+ (category web)
+ (depends utf8 sql-de-lite srfi-19 civet lowdown simple-sha1)
+ ;(test-depends test)
+ (author "Matt Gushee")
+ (synopsis "A simple [?] blogging platform."))
