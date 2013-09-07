@@ -5,7 +5,7 @@
 ;;;   BSD license. See the accompanying LICENSE file for details.
 
 ; Just for initial development phase
-(load "cav-db.so")
+; (load "cav-db.so")
 
 (module cav-db-sqlite
         *
@@ -23,10 +23,10 @@
         (use (prefix sql-de-lite sd:))
         (use srfi-19)
 
-        ; (use cav-db)
+        (use cav-db)
         ; Just for initial development phase
         ; (require-library cav-db)
-        (import cav-db)
+        ; (import cav-db)
 
 ; These 4 params probably only needed in cav-db
 ; (define current-connection (make-parameter #f))
@@ -684,7 +684,7 @@ SQL
 
 (define get-articles-all-query
 #<<SQL
-SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len, sticky, sticky_until
+SELECT node_id, title, subtitle, created_dt, teaser_len, sticky, sticky_until
 FROM articles
 ORDER BY created_dt DESC
 LIMIT ? OFFSET ?;
@@ -693,7 +693,7 @@ SQL
 
 (define get-articles-with-tag-query
 #<<SQL
-SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len, sticky, sticky_until
+SELECT node_id, title, subtitle, created_dt, teaser_len, sticky, sticky_until
 FROM articles, articles_x_tags, tags
 WHERE articles_x_tags.article = articles.id AND articles_x_tags.tag = tags.id AND tags.tag = ?
 ORDER BY created_dt DESC
@@ -703,7 +703,7 @@ SQL
 
 (define get-articles-by-author-query
 #<<SQL
-SELECT node_id, title, series, series_pt, subtitle, created_dt, teaser_len, sticky, sticky_until
+SELECT node_id, title, subtitle, created_dt, teaser_len, sticky, sticky_until
 FROM articles, articles_x_tags, tags
 WHERE articles_x_authors.article = articles.id AND articles_x_authors = users.id AND users.uname = ?
 ORDER BY created_dt DESC
@@ -784,6 +784,7 @@ SQL
           content
           (append content `(children . ,(map loop kid-ids))))))))
 
+;;; FIXME -- should be using get-article-common-data here
 (define (%get-articles #!key (limit 10) (offset 0) (mk-teaser identity)
                        (tag #f) (author #f))
   (let-values (((param qcount qdata)
@@ -795,6 +796,7 @@ SQL
            (st-count (sd:sql/transient conn qcount))
            (st-data (sd:sql/transient conn qdata))
            (st-auth (sd:sql conn get-article-authors-query))
+           (st-series (sd:sql conn get-article-series-query))
            (st-tags (sd:sql conn get-article-tags-query))
            (count
              (car
@@ -824,23 +826,22 @@ SQL
           (let* ((datum (car data-in))
                  (node-id (alist-ref 'node_id datum))
                  (authors (sd:query sd:fetch-alists st-auth node-id))
+                 (series (sd:query sd:fetch st-series node-id))
                  (tags (sd:query sd:fetch-all st-tags node-id))
                  (content (%get-article-content node-id)))
-            (loop
-              (cdr data-in)
-              (cons
-                (cons
-                  ;(cons 'authors authors)
-                  (cons 'authors (falsify authors))
-                  ;(cons 'authors (cull-null authors))
-                  (cons
-                    (cons 'tags (flatten tags))
-                    (cons
-                      (process-content content)
-                      ;datum)))
-                      (falsify datum))))
-                      ;(cull-null datum))))
-                data-out))))))))
+            (let* ((result*
+                     (cons
+                       `(authors . ,(falsify authors))
+                       (cons
+                         `(tags . ,(flatten tags))
+                         (cons
+                           (process-content content)
+                           (falsify datum)))))
+                   (result
+                     (if (null? series)
+                       result*
+                       (cons `(series . ,(car series)) (cons `(series_pt . ,(cadr series)) result*)))))
+              (loop (cdr data-in) (cons result data-out)))))))))
 
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO

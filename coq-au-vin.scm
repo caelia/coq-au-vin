@@ -4,7 +4,7 @@
 ;;;   This program is open-source software, released under the
 ;;;   BSD license. See the accompanying LICENSE file for details.
 
-(load "./cav-db.so")
+;(load "./cav-db.so")
 ;(require-library cav-db)
 
 (module coq-au-vin
@@ -18,7 +18,8 @@
         (import srfi-1)
         ; (import srfi-13)
 
-        (import (prefix cav-db db:))
+        ;(import (prefix cav-db db:))
+        (use (prefix cav-db db:))
   
         (use lowdown)
         (use (prefix civet cvt:))
@@ -27,9 +28,9 @@
         ; ;; FIXME: Need a better password hash! 
         (use simple-sha1)
 
-        (use spiffy)
-        (use intarweb)
-        (use uri-match)
+        ; (use spiffy)
+        ; (use intarweb)
+        ; (use uri-match)
 
         (use utf8)
         (use utf8-srfi-13)
