@@ -5,3 +5,7 @@
 *.import.scm
 *.db
 scratch/*
+examples/demo-site1/pages/*.html
+*-pages
+*.html
+*.sxml
