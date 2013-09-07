@@ -10,7 +10,7 @@
 
 (define output-path "examples/demo-site1/pages")
 
-(let* ((ctx (get-article-list-ctx))
+(let* ((ctx (get-article-list-ctx limit: 20))
        (sx (get-article-list-sxml ctx))
        (page-path (make-pathname output-path "index" "html")))
   (write-html sx page-path))
