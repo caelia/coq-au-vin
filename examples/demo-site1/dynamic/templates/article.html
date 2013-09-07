@@ -50,12 +50,16 @@
     </script>
   </cvt:block>
 
+  <cvt:block name="styleSheets">
+    <link id="ss-main" rel="stylesheet" type="text/css" href="main.css" />
+  </cvt:block>
+
   <!--
   <cvt:block name="bodyClass">SingleArticle</cvt:block>
   -->
   
   <cvt:block name="headerContent">
-    <h1>S I N G L E   A R T I C L E   P A G E</h1>
+    <h1>S I N G L E &#xa0; A R T I C L E &#xa0; P A G E</h1>
   </cvt:block>
   
   <cvt:block name="leftSideContent">
@@ -64,14 +68,14 @@
   
   <cvt:block name="mainContent">
     <cvt:if test="series">
-      <h4 id="seriesTitle"><cvt:var name="series"/><cvt:if test="series_pt">, Part <cvt:var name="series_pt"/></cvt:if></h4>
+      <h4 class="seriesTitle"><cvt:var name="series"/><cvt:if test="series_pt">, Part <cvt:var name="series_pt"/></cvt:if></h4>
     </cvt:if>
-    <h3 id="articleTitle"><cvt:var name="article_title"/></h3>
+    <h3 class="articleTitle"><cvt:var name="article_title"/></h3>
     <cvt:if test="subtitle">
       <h5 id="articleSubTitle"><cvt:var name="subtitle"/></h5>
     </cvt:if>
-    <div id="author-time">
-      <span id="authors">
+    <div class="author-time">
+      <span class="authors">
         <cvt:for each="awthur" in="authors" sort="alpha" sort-field="uname">
           <cvt:interpolate mode="pair">&amp; </cvt:interpolate>
           <cvt:interpolate mode="last">, &amp; </cvt:interpolate>
@@ -85,16 +89,17 @@
         </cvt:for>
       </span>
       |
-      <span id="created">
+      <span class="created">
         <cvt:var name="created_dt" />
       </span>
     </div>
-    <div id="articleBody">
+    <div class="articleBody">
       <cvt:var name="article_body"/>
     </div>
-    <div id="articleTags">
+    <div class="articleTags">
       <strong>Tags:</strong>
       <cvt:for each="tag" in="tags" sort="alpha">
+        <cvt:interpolate>, </cvt:interpolate>
         <cvt:with>
           <cvt:defvar name="tag_url">http://this.site/tag/<cvt:var name="tag" format="uri"/></cvt:defvar>
           <a cvt:href="tag_url">

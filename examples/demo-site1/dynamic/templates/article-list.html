@@ -9,6 +9,21 @@
     <cvt:defvar name="contentPath">
       <cvt:var name="urlScheme"/>://<cvt:var name="hostName"/>/content/
     </cvt:defvar>
+
+    <!-- This doesn't work, because cvt:attr is handled outside the normal flow
+    <cvt:defmacro name="articleHREF">
+      <cvt:attr name="href"><cvt:var name="article.node_id" />.html</cvt:attr>
+    </cvt:defmacro>
+    -->
+
+    <cvt:defmacro name="tagLink">
+      <a>
+        <cvt:attr name="href">
+          /tag/<cvt:var name="tag" format="uri" />
+        </cvt:attr>
+        <cvt:var name="tag" />
+      </a>
+    </cvt:defmacro>
   </cvt:head>
 
   <cvt:block name="pageScripts">
@@ -50,12 +65,16 @@
     </script>
   </cvt:block>
 
+  <cvt:block name="styleSheets">
+    <link id="ss-main" rel="stylesheet" type="text/css" href="main.css" />
+  </cvt:block>
+
   <!--
   <cvt:block name="bodyClass">SingleArticle</cvt:block>
   -->
   
   <cvt:block name="headerContent">
-    <h1>A R T I C L E   L I S T   P A G E</h1>
+    <h1>A R T I C L E &#xa0; L I S T &#xa0; P A G E</h1>
   </cvt:block>
   
   <cvt:block name="leftSideContent">
@@ -63,47 +82,55 @@
   </cvt:block>
   
   <cvt:block name="mainContent">
-    <cvt:for each="article" in="articles" sort="numeric" sort-field="raw_dt" order="desc">
-      <cvt:if test="article.series">
-        <h4 id="seriesTitle"><cvt:var name="article.series"/><cvt:if test="article.series_pt">, Part <cvt:var name="article.series_pt"/></cvt:if></h4>
-      </cvt:if>
-      <h3 id="articleTitle"><cvt:var name="article.article_title"/></h3>
-      <cvt:if test="subtitle">
-        <h5 id="articleSubTitle"><cvt:var name="article.subtitle"/></h5>
-      </cvt:if>
-      <div id="author-time">
-        <span id="authors">
-          <cvt:if test="article.author.display_name">
-            <cvt:var name="article.author.display_name" />
-            <cvt:else>
-              <cvt:var name="article.author.uname" />
-            </cvt:else>
-          </cvt:if>
-          <cvt:if test="article.other_authors">
-            <cvt:for each="a" in="article.other_authors" sort="alpha" sort-field="uname">
-              &amp;
-              <cvt:if test="a.display_name">
-                <cvt:var name="a.display_name" />
+    <!-- <cvt:for each="article" in="articles" sort="numeric" sort-field="raw_dt" order="desc"> -->
+    <!-- Already sorted by SQL query. -->
+    <cvt:for each="article" in="articles" sort="none">
+      <div class="TeaserBlock">
+        <cvt:if test="article.series">
+          <h4 class="seriesTitle"><cvt:var name="article.series"/><cvt:if test="article.series_pt">, Part <cvt:var name="article.series_pt"/></cvt:if></h4>
+        </cvt:if>
+        <h3 class="articleTitle">
+          <a>
+            <cvt:attr name="href"><cvt:var name="article.node_id" />.html</cvt:attr>
+            <cvt:var name="article.article_title"/>
+          </a>
+        </h3>
+        <cvt:if test="subtitle">
+          <h5 class="articleSubTitle"><cvt:var name="article.subtitle"/></h5>
+        </cvt:if>
+        <div class="author-time">
+          <span class="authors">
+            <cvt:for each="awthur" in="article.authors" sort="alpha" sort-field="uname">
+              <cvt:interpolate mode="pair"> &amp; </cvt:interpolate>
+              <cvt:interpolate mode="last">, &amp; </cvt:interpolate>
+              <cvt:interpolate>, </cvt:interpolate>
+              <cvt:if test="awthur.display_name">
+                <cvt:var name="awthur.display_name" />
                 <cvt:else>
-                  <cvt:var name="a.uname" />
+                  <cvt:var name="awthur.uname" />
                 </cvt:else>
               </cvt:if>
             </cvt:for>
-          </cvt:if>
-        </span>
-        |
-        <span id="created">
-          <cvt:var name="article.created_dt" />
-        </span>
-      </div>
-      <div id="teaser">
-        <cvt:var name="article.teaser"/>
-        <a>  
-          <cvt:attr name="href">
-            <cvt:var name="contentPath"/><cvt:var name="article.node_id"/>
-          </cvt:attr>
-          MORE
-        </a>
+          </span>
+          |
+          <span class="created">
+            <cvt:var name="article.created_dt" />
+          </span>
+        </div>
+        <div class="teaser">
+          <cvt:var name="article.teaser"/>
+          <a>  
+            <cvt:attr name="href"><cvt:var name="article.node_id" />.html</cvt:attr>
+            MORE
+          </a>
+        </div>
+        <div class="tags">
+          Tags:
+          <cvt:for each="tag" in="article.tags" sort="alpha">
+            <cvt:interpolate>, </cvt:interpolate>
+            <cvt:macro name="tagLink" />
+          </cvt:for>
+        </div>
       </div>
     </cvt:for>
   </cvt:block>
