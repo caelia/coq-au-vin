@@ -4,6 +4,8 @@
 (use simple-sha1)
 (use numbers)
 
+(define %db-file% (make-parameter "examples/demo-site1/data/preloaded.db"))
+
 (define (alist-stref match lst)
   (alist-ref match lst string=?))
 
@@ -337,7 +339,7 @@
 
 (define (store-tags)
   (call-with-database
-    "examples/demo-site1/data/preloaded.db"
+    (%db-file%)
     (lambda (db)
       (let ((st (sql db "INSERT INTO tags (tag) VALUES (?);")))
         (for-each
@@ -346,7 +348,7 @@
 
 (define (store-series)
   (call-with-database
-    "examples/demo-site1/data/preloaded.db"
+    (%db-file%)
     (lambda (db)
       (let ((st (sql db "INSERT INTO series (title, description) VALUES (?, 'A series');")))
         (for-each
@@ -355,7 +357,7 @@
 
 (define (store-roles)
   (call-with-database
-    "examples/demo-site1/data/preloaded.db"
+    (%db-file%)
     (lambda (db)
       (let ((st (sql db "INSERT INTO roles (name) VALUES (?);")))
         (for-each
@@ -364,7 +366,7 @@
 
 (define (store-authors)
   (call-with-database
-    "examples/demo-site1/data/preloaded.db"
+    (%db-file%)
     (lambda (db)
       (let ((st/dispname
               (sql db
@@ -408,7 +410,7 @@
 
 (define (store-articles #!optional (articles (fixed-articles)))
   (call-with-database
-    "examples/demo-site1/data/preloaded.db"
+    (%db-file%)
     (lambda (db)
       (let ((st-art/series
               (sql db

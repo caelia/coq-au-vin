@@ -6,7 +6,7 @@
 ; (use sxml-transforms)
 ; (use sxml-serializer)
 
-(include "demo-setup.scm")
+(include "demo-lib.scm")
 
 (define output-path "examples/demo-site1/pages")
 
