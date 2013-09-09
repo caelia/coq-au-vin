@@ -704,8 +704,18 @@ SQL
 (define get-articles-by-author-query
 #<<SQL
 SELECT node_id, title, subtitle, created_dt, teaser_len, sticky, sticky_until
-FROM articles, articles_x_tags, tags
+FROM articles, articles_x_authors, users
 WHERE articles_x_authors.article = articles.id AND articles_x_authors = users.id AND users.uname = ?
+ORDER BY created_dt DESC
+LIMIT ? OFFSET ?;
+SQL
+)
+
+(define get-series-articles-query
+#<<SQL
+SELECT node_id, title, subtitle, created_dt, teaser_len, sticky, sticky_until
+FROM articles, series
+WHERE articles.series = series.id AND series.title = ?
 ORDER BY created_dt DESC
 LIMIT ? OFFSET ?;
 SQL
@@ -786,11 +796,13 @@ SQL
 
 ;;; FIXME -- should be using get-article-common-data here
 (define (%get-articles #!key (limit 10) (offset 0) (mk-teaser identity)
-                       (tag #f) (author #f))
+                       (tag #f) (author #f) (series #f))
   (let-values (((param qcount qdata)
                 (cond
                   (tag (values tag get-article-with-tag-count-query get-articles-with-tag-query))
                   (author (values author get-article-by-author-count-query get-articles-by-author-query))
+                  ; Uh-oh, there's already an st-series below. Need to think about this.
+                  ; (series (values series get-series-articles-count-query get-series-articles-query))
                   (else (values #f get-article-count-query get-articles-all-query)))))
     (let* ((conn (current-connection))
            (st-count (sd:sql/transient conn qcount))
