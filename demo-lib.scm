@@ -53,7 +53,6 @@
           (else
             (let ((res (if (null? val) (cons key "") pair)))
               (cons res prev))))))
-
     '()
     article-data))
 
