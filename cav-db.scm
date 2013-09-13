@@ -118,6 +118,8 @@
 
 (define get-articles (make-parameter #f))
 
+(define get-ids-custom (make-parameter #f))
+
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 
