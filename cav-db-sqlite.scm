@@ -627,6 +627,14 @@ WHERE node_id = ? AND series.id = articles.series;
 SQL
 )
 
+(define get-article-categories-query
+#<<SQL
+SELECT categories.category
+FROM articles, articles_x_categories, categories
+WHERE node_id = ? AND articles_x_categories.article = articles.id AND articles_x_categories.category = categories.id ;
+SQL
+)
+
 (define get-article-authors-query
 #<<SQL
 SELECT uname, display_name
@@ -783,18 +791,19 @@ SQL
 
 (define (%get-article-common-data conn node-id)
   (let* ((st-series (sd:sql/transient conn get-article-series-query))
+         (st-categories (sd:sql/transient conn get-article-categories-query))
          (st-auth (sd:sql/transient conn get-article-authors-query))
          (st-tags (sd:sql/transient conn get-article-tags-query))
          (series (sd:query sd:fetch-alist st-series node-id))
+         (categories (sd:query sd:fetch-all st-categories node-id))
          (authors (sd:query sd:fetch-alists st-auth node-id))
          (tags (sd:query sd:fetch-all st-tags node-id))
          (content (%get-article-content node-id)))
     (append
       `((content . ,content)
-        ;(authors . ,authors)
         (authors . ,(falsify authors))
-        ;(authors . ,(cull-null authors))
-        (tags . ,(flatten tags)))
+        (tags . ,(flatten tags))
+        (categories . ,(flatten categories)))
       series)))
 
 (define (%get-article-by-nodeid node-id)
@@ -802,9 +811,7 @@ SQL
          (st-data (sd:sql/transient conn get-article-by-nodeid-query))
          (article-data (sd:query sd:fetch-alist st-data node-id)))
     (append
-      ;article-data
       (falsify article-data)
-      ;(cull-null article-data)
       (%get-article-common-data conn node-id))))
 
 (define (%get-article-by-alias alias)
@@ -813,9 +820,7 @@ SQL
          (article-data (sd:query sd:fetch-alist st-data alias))
          (node-id (alist-ref 'node_id article-data)))
     (append
-      ;article-data
       (falsify article-data)
-      ;(cull-null article-data)
       (%get-article-common-data conn node-id))))
 
 (define (%get-article-comment-ids node-id)
@@ -834,43 +839,19 @@ SQL
           content
           (append content `(children . ,(map loop kid-ids))))))))
 
-;;; FIXME -- should be using get-article-common-data here
-(define (%get-articles #!key (limit 10) (offset 0) (mk-teaser identity)
-                       (tag #f) (author #f) (series #f))
-  (let-values (((param qcount qdata)
-                (cond
-                  (tag (values tag get-article-with-tag-count-query get-articles-with-tag-query))
-                  (author (values author get-article-by-author-count-query get-articles-by-author-query))
-                  ; Uh-oh, there's already an st-series below. Need to think about this.
-                  ; (series (values series get-series-articles-count-query get-series-articles-query))
-                  (else (values #f get-article-count-query get-articles-all-query)))))
-    (let* ((conn (current-connection))
-           (st-count (sd:sql/transient conn qcount))
-           (st-data (sd:sql/transient conn qdata))
-           (st-auth (sd:sql conn get-article-authors-query))
-           (st-series (sd:sql conn get-article-series-query))
-           (st-tags (sd:sql conn get-article-tags-query))
-           (count
-             (car
-               (if param
-                 (sd:query sd:fetch st-count param)
-                 (sd:query sd:fetch st-count))))
-           (data*
-             (if param
-               (sd:query sd:fetch-alists st-data param limit offset)
-               (sd:query sd:fetch-alists st-data limit offset)))
-;           (process-content
-;             (lambda (cont)
-;               (map
-;                 (lambda (pair)
-;                   (if (eqv? (car pair) 'body)
-;                     (cons 'teaser (mk-teaser (cdr pair)))
-;                     pair))))))
-           ;; FIXME -- hmmm ... probably want to enable add additional stuff for
-           ;; the future.
-           (process-content
-             (lambda (cont)
-               (cons 'teaser (mk-teaser (alist-ref 'body cont))))))
+(define (%get-articles #!key (criterion 'all) (limit 10) (offset 0) (mk-teaser identity))
+  (let* ((qcount get-article-with-tag-count-query)
+         (qdata get-articles-with-tag-query)
+         (conn (current-connection))
+         (st-count (sd:sql/transient conn qcount))
+         (st-data (sd:sql/transient conn qdata))
+         (count (car (sd:query sd:fetch st-count tag)))
+         (data* (sd:query sd:fetch-alists st-data tag limit offset))
+         ;; FIXME -- hmmm ... probably want to enable add additional stuff for
+         ;; the future.
+         (process-content
+           (lambda (cont)
+             (cons 'teaser (mk-teaser (alist-ref 'body cont))))))
       (let loop ((data-in data*)
                  (data-out '()))
         (if (null? data-in)
@@ -878,7 +859,7 @@ SQL
           (let* ((datum (car data-in))
                  (node-id (alist-ref 'node_id datum))
                  (authors (sd:query sd:fetch-alists st-auth node-id))
-                 (series (sd:query sd:fetch st-series node-id))
+                 (series (sd:query sd:fetch st-art-series node-id))
                  (tags (sd:query sd:fetch-all st-tags node-id))
                  (content (%get-article-content node-id)))
             (let* ((result*
@@ -894,6 +875,24 @@ SQL
                        result*
                        (cons `(series . ,(car series)) (cons `(series_pt . ,(cadr series)) result*)))))
               (loop (cdr data-in) (cons result data-out)))))))))
+
+(define (%get-articles-with-tag tag #!key (limit 10) (offset 0) (mk-teaser identity))
+  (%get-articles criterion: `(tag ,tag) limit: limit offset: offset mk-teaser: mk-teaser))
+
+(define (%get-articles-by-author author #!key (limit 10) (offset 0) (mk-teaser identity))
+  (%get-articles criterion: `(author ,author) limit: limit offset: offset mk-teaser: mk-teaser))
+
+(define (%get-articles-in-series series #!key (limit 10) (offset 0) (mk-teaser identity))
+  (%get-articles criterion: `(series ,series) limit: limit offset: offset mk-teaser: mk-teaser))
+
+(define (%get-articles-with-category category #!key (limit 10) (offset 0) (mk-teaser identity))
+  (%get-articles criterion: `(category ,category) limit: limit offset: offset mk-teaser: mk-teaser))
+
+(define (%get-articles-by-date date #!key (limit 10) (offset 0) (mk-teaser identity))
+  (%get-articles criterion: `(date ,date) limit: limit offset: offset mk-teaser: mk-teaser))
+
+(define (%get-articles-in-date-range start end #!key (limit 10) (offset 0) (mk-teaser identity))
+  (%get-articles criterion: `(date-range ,start ,end) limit: limit offset: offset mk-teaser: mk-teaser))
 
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
