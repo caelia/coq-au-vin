@@ -363,8 +363,8 @@
 (define (get-article/json id/alias #!optional (out (current-output-port)))
   #f)
 
-(define (get-article-page/html id/alias #!optional (out (current-output-port))
-                               #!key (date-format #f))
+(define (get-article-page/html id/alias #!key (out (current-output-port))
+                               (date-format #f))
   (let* ((article-data (get-article-data id/alias))
          ; (html-body (process-body article-data))
          (vars
@@ -404,8 +404,8 @@
     (cvt:render "article.html" ctx port: out)))
 
 
-(define (get-article-list/html #!optional (out (current-output-port))
-                               #!key (filters 'latest) (sort '(created desc))
+(define (get-article-list/html #!key (out (current-output-port))
+                               (filters 'latest) (sort '(created desc))
                                (per-page 10) (show 'teaser))
   #f)
 
