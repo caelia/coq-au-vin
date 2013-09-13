@@ -22,6 +22,7 @@
         (use utf8-srfi-13)
         (use (prefix sql-de-lite sd:))
         (use srfi-19)
+        (use sets)
 
         (use cav-db)
         ; Just for initial development phase
@@ -682,6 +683,45 @@ WHERE articles_x_authors.article = articles.id AND articles_x_authors = users.id
 SQL
 )
 
+(define get-ids-all-query
+#<<SQL
+SELECT node_id
+FROM articles
+ORDER BY created_dt DESC
+LIMIT ? OFFSET ?;
+SQL
+)
+
+(define get-ids-with-tag-query
+#<<SQL
+SELECT node_id
+FROM articles, articles_x_tags, tags
+WHERE articles_x_tags.article = articles.id AND articles_x_tags.tag = tags.id AND tags.tag = ?
+ORDER BY created_dt DESC
+LIMIT ? OFFSET ?;
+SQL
+)
+
+(define get-ids-by-author-query
+#<<SQL
+SELECT node_id
+FROM articles, articles_x_authors, users
+WHERE articles_x_authors.article = articles.id AND articles_x_authors = users.id AND users.uname = ?
+ORDER BY created_dt DESC
+LIMIT ? OFFSET ?;
+SQL
+)
+
+(define get-series-ids-query
+#<<SQL
+SELECT node_id
+FROM articles, series
+WHERE articles.series = series.id AND series.title = ?
+ORDER BY created_dt DESC
+LIMIT ? OFFSET ?;
+SQL
+)
+
 (define get-articles-all-query
 #<<SQL
 SELECT node_id, title, subtitle, created_dt, teaser_len, sticky, sticky_until
@@ -859,7 +899,7 @@ SQL
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 
-(define (activate-sqlite)
+(define (enable-sqlite)
   (setup-db %setup-db)
   (add-role %add-role)
   (delete-role %delete-role)
@@ -894,6 +934,7 @@ SQL
   (get-article-comment-ids %get-article-comment-ids)
   (get-comment-thread %get-comment-thread)
   (get-articles %get-articles)
+  (get-ids-custom %get-ids-custom)
   #t)
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
