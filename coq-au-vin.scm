@@ -345,6 +345,9 @@
     ((db:get-article-by-nodeid) id/alias)
     ((db:get-article-by-alias) id/alias)))
 
+(define (get-article-list-data #!key (tag #f) (author #f) (series #f)
+                               (limit 10) (offset 0) (teaser-len #f))
+  
 (define (process-body article-data)
   (let* ((raw-body (alist-ref 'body (alist-ref 'content article-data)))
          (sanitized-body (escape-html raw-body)))
