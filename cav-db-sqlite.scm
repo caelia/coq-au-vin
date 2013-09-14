@@ -789,11 +789,37 @@ SQL
   (let ((article-path (make-pathname (content-path) node-id))) 
     `((body . ,(%get-article-body article-path)))))
 
-(define (%get-article-common-data conn node-id)
-  (let* ((st-series (sd:sql/transient conn get-article-series-query))
-         (st-categories (sd:sql/transient conn get-article-categories-query))
-         (st-auth (sd:sql/transient conn get-article-authors-query))
-         (st-tags (sd:sql/transient conn get-article-tags-query))
+(define (statement-generator/single conn queries)
+  (lambda (sym)
+    (sd:sql/transient conn (alist-ref sym queries))))
+
+(define (statement-generator/multi conn queries)
+  (let ((statements
+          (map
+            (lambda (sym+query)
+              (let ((sym (car sym+query)) (query (cdr sym+query)))
+                (cons sym (sd:sql conn query))))
+            queries)))
+    (lambda (sym)
+      (alist-ref sym statements))))
+
+(define common-data-queries
+  '((series . get-article-series-query)
+    (categories . get-article-categories-query)
+    (authors . get-article-authors-query)
+    (tags . get-article-tags-query)))
+
+(define (common-data-stgen/single conn)
+  (statement-generator/single conn common-data-queries))
+
+(define (common-data-stgen/multi conn)
+  (statement-generator/multi conn common-data-queries))
+
+(define (%get-article-common-data stgen node-id)
+  (let* ((st-series (stgen 'series))
+         (st-categories (stgen 'categories))
+         (st-auth (stgen 'authors))
+         (st-tags (stgen 'tags))
          (series (sd:query sd:fetch-alist st-series node-id))
          (categories (sd:query sd:fetch-all st-categories node-id))
          (authors (sd:query sd:fetch-alists st-auth node-id))
@@ -809,19 +835,21 @@ SQL
 (define (%get-article-by-nodeid node-id)
   (let* ((conn (current-connection))
          (st-data (sd:sql/transient conn get-article-by-nodeid-query))
-         (article-data (sd:query sd:fetch-alist st-data node-id)))
+         (article-data (sd:query sd:fetch-alist st-data node-id))
+         (stgen (common-data-stgen/single conn)))
     (append
       (falsify article-data)
-      (%get-article-common-data conn node-id))))
+      (%get-article-common-data stgen node-id))))
 
 (define (%get-article-by-alias alias)
   (let* ((conn (current-connection))
          (st-data (sd:sql/transient conn get-article-by-alias-query))
          (article-data (sd:query sd:fetch-alist st-data alias))
-         (node-id (alist-ref 'node_id article-data)))
+         (node-id (alist-ref 'node_id article-data))
+         (stgen (common-data-stgen/single conn)))
     (append
       (falsify article-data)
-      (%get-article-common-data conn node-id))))
+      (%get-article-common-data stgen node-id))))
 
 (define (%get-article-comment-ids node-id)
   (let* ((conn (current-connection))
