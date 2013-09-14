@@ -116,7 +116,19 @@
 
 (define get-comment-thread (make-parameter #f))
 
-(define get-articles (make-parameter #f))
+(define get-articles-all (make-parameter #f))
+
+(define get-articles-with-tag (make-parameter #f))
+
+(define get-articles-by-author (make-parameter #f))
+
+(define get-articles-in-series (make-parameter #f))
+
+(define get-articles-with-category (make-parameter #f))
+
+(define get-articles-by-date (make-parameter #f))
+
+(define get-articles-in-date-range (make-parameter #f))
 
 (define get-ids-custom (make-parameter #f))
 
