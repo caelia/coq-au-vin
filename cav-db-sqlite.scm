@@ -839,19 +839,78 @@ SQL
           content
           (append content `(children . ,(map loop kid-ids))))))))
 
-(define (%get-articles #!key (criterion 'all) (limit 10) (offset 0) (mk-teaser identity))
-  (let* ((qcount get-article-with-tag-count-query)
-         (qdata get-articles-with-tag-query)
-         (conn (current-connection))
-         (st-count (sd:sql/transient conn qcount))
-         (st-data (sd:sql/transient conn qdata))
-         (count (car (sd:query sd:fetch st-count tag)))
-         (data* (sd:query sd:fetch-alists st-data tag limit offset))
-         ;; FIXME -- hmmm ... probably want to enable add additional stuff for
-         ;; the future.
-         (process-content
-           (lambda (cont)
-             (cons 'teaser (mk-teaser (alist-ref 'body cont))))))
+(define (%prepare-get-articles-queries criterion)
+  (if (list? criterion)
+    (case (car criterion)
+      ((tag)
+       (values
+         get-article-with-tag-count-query
+         get-articles-with-tag-query
+         (cadr criterion) #f))
+      ((author)
+       (values
+         get-article-by-author-count-query
+         get-articles-by-author-query
+         (cadr criterion) #f))
+      ((series)
+       (values
+         get-article-in-series-count-query
+         get-articles-in-series-query
+         (cadr criterion) #f))
+      ((category)
+       (values
+         get-article-with-category-count-query
+         get-articles-with-category-query
+         (cadr criterion) #f))
+      ((date)
+       (values
+         get-article-by-date-count-query
+         get-articles-by-date-query
+         (cadr criterion) #f))
+      ((date-range)
+       (values
+         get-article-in-date-range-count-query
+         get-articles-in-date-range-query
+         (cadr criterion) (caddr criterion))))
+    (values
+      get-article-count-query
+      get-articles-all-query
+      #f #f)))
+
+(define (%get-articles-0 st-count st-data limit offset)
+  (values (car (sd:query sd:fetch st-count))
+          (sd:query sd:fetch-alists st-data limit offset)))
+
+(define (%get-articles-1 st-count st-data param limit offset)
+  (values (car (sd:query sd:fetch st-count param))
+          (sd:query sd:fetch-alists st-data param limit offset)))
+
+(define (%get-articles-2 st-count st-data param1 param2 limit offset)
+  (values (car (sd:query sd:fetch st-count param1 param2))
+          (sd:query sd:fetch-alists st-data param1 param2 limit offset)))
+
+(define (%get-articles #!key (criterion 'all) (limit 10) (offset 0)
+                       (mk-teaser identity))
+  (let-values (((qcount qdata param1 param2)
+                (%prepare-get-articles-queries criterion)))
+    (let* ((conn (current-connection))
+           (st-count (sd:sql/transient conn qcount))
+           (st-data (sd:sql/transient conn qdata))
+           ;; FIXME -- hmmm ... probably want to enable add additional stuff
+           ;; for the future.
+           (process-content
+             (lambda (cont)
+               (cons 'teaser (mk-teaser (alist-ref 'body cont))))))
+      (let-values (((count data*)
+                    (cond
+                      ((and param1 param2)
+                       (%get-articles-2 st-count st-data param1 param2
+                                        limit offset))
+                      (param1
+                       (%get-articles-1 st-count st-data param1 
+                                        limit offset))
+                      (else
+                       (%get-articles-0 st-count st-data limit offset)))))
       (let loop ((data-in data*)
                  (data-out '()))
         (if (null? data-in)
