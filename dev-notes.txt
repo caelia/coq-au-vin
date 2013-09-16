@@ -1,0 +1,14 @@
+Developer Notes for Coq-au-Vin
+==============================
+
+2013-09-15: Hand-rolled date processing routines?
+    The original impetus for this is that SRFI-19's time->second function
+    outputs a number that can't be processed without the numbers egg. So the
+    dependencies start to look rather heavy. And it turns out that,
+    according my time tests, using just Posix time functions + hand-coded
+    parsing runs about 10x faster than the SRFI-19 version. It should also
+    be noted that using posix string->time is a bit faster than my
+    string-split + string->number version. However, that difference is only
+    around 20-30%. And if I'm not using SRFI-19, the next-day function needs
+    to operate on Y-M-D tuples, so it seems preferable to keep it simple by
+    using Y-M-D for everything.
