@@ -16,6 +16,7 @@
         (import files)
         (import utils)
         (import ports)
+        (import posix)
         (import data-structures)
 
         (use utf8)
@@ -52,26 +53,6 @@
           (else pair))))
     alist))
 
-; (define (falsify alist)
-;   (let ((falsified
-;           (map
-;             (lambda (pair)
-;               (let ((key (car pair))
-;                     (val (cdr pair)))
-;                 (cond
-;                   ((null? val) `(,key . #f))
-;                   ((list? val) `(,key . ,(falsify val)))
-;                   (else pair))))
-;             alist)))
-;     (with-output-to-file
-;       "falsify.log"
-;       (lambda ()
-;         (print "ORIG:")
-;         (pp alist)
-;         (print "FALSIFIED:")
-;         (pp falsified)))
-;     falsified))
-
 (define (cull-null alist)
   (foldl
     (lambda (prev pair)
@@ -83,6 +64,49 @@
           (else (cons pair prev)))))
     '()
     alist))
+
+(define (leap-year? y)
+  (or (= (modulo y 400) 0)
+      (and (= (modulo y 4) 0)
+           (not (= (modulo y 100) 0)))))
+
+(define (ymd->seconds ymd)
+  (let* ((y (- (car ymd) 1900))
+         (m (- (cadr ymd) 1))
+         (d (caddr ymd))
+         (time (vector 0 0 0 d m y 0 0 0 0)))
+    (local-time->seconds time)))
+
+(define (next-day ymd)
+  (let* ((y (car ymd))
+         (m (cadr ymd))
+         (d (caddr ymd))
+         (feb-last (if (leap-year? y) 29 28)))
+    (cond
+      ((or (> m 12) (< m 1) (> d 31) (< d 1))
+       (error "Invalid date."))
+      ((and (member m '(4 6 9 11))
+            (> d 30))
+       (error "Invalid date."))
+      ((and (= m 2) (> d feb-last))
+       (error "Invalid date."))
+      ((and (= m 12) (= d 31))
+       (list (+ y 1) 1 1))
+      ((and (member m '(1 3 5 7 8 10)) (= d 31))
+       (list y (+ m 1) 1))
+      ((and (member m '(4 6 9 11)) (= d 30))
+       (list y (+ m 1) 1))
+      ((and (= m 2) (= d feb-last))
+       (list y (+ m 1) 1))
+      (else
+        (list y m (+ d 1))))))
+
+(define (parse-date isodate)
+  (map string->number (string-split isodate "-")))
+
+(define (isodate->seconds date-str)
+  (ymd->seconds (parse-date date-str)))
+
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  INITIAL SETUP  ---------------------------------------------------
 
@@ -769,6 +793,18 @@ LIMIT ? OFFSET ?;
 SQL
 )
 
+(define get-articles-with-category-query
+#<<SQL
+SELECT node_id, title, subtitle, created_dt, teaser_len, sticky, sticky_until
+FROM articles, articles_x_categories, categories
+WHERE articles_x_categories.article = articles.id
+  AND articles_x_categories.category = categories.id
+  AND categories.category = ?
+ORDER BY created_dt DESC
+LIMIT ? OFFSET ?;
+SQL
+)
+
 ;;; ========================================================================
 ;;; ------  Functions  -----------------------------------------------------
 
@@ -890,11 +926,6 @@ SQL
          get-article-with-category-count-query
          get-articles-with-category-query
          (cadr criterion) #f))
-      ((date)
-       (values
-         get-article-by-date-count-query
-         get-articles-by-date-query
-         (cadr criterion) #f))
       ((date-range)
        (values
          get-article-in-date-range-count-query
@@ -905,25 +936,25 @@ SQL
       get-articles-all-query
       #f #f)))
 
-(define (%get-articles-0 st-count st-data limit offset)
+(define (%get-article-list-0 st-count st-data limit offset)
   (values (car (sd:query sd:fetch st-count))
           (sd:query sd:fetch-alists st-data limit offset)))
 
-(define (%get-articles-1 st-count st-data param limit offset)
+(define (%get-article-list-1 st-count st-data param limit offset)
   (values (car (sd:query sd:fetch st-count param))
           (sd:query sd:fetch-alists st-data param limit offset)))
 
-(define (%get-articles-2 st-count st-data param1 param2 limit offset)
+(define (%get-article-list-2 st-count st-data param1 param2 limit offset)
   (values (car (sd:query sd:fetch st-count param1 param2))
           (sd:query sd:fetch-alists st-data param1 param2 limit offset)))
 
-(define (%get-articles #!key (criterion 'all) (limit 10) (offset 0)
-                       (mk-teaser identity))
+(define (%get-article-list criterion limit offset mk-teaser)
   (let-values (((qcount qdata param1 param2)
                 (%prepare-get-articles-queries criterion)))
     (let* ((conn (current-connection))
            (st-count (sd:sql/transient conn qcount))
            (st-data (sd:sql/transient conn qdata))
+           (stgen (common-data-stgen/multi conn))
            ;; FIXME -- hmmm ... probably want to enable add additional stuff
            ;; for the future.
            (process-content
@@ -932,54 +963,46 @@ SQL
       (let-values (((count data*)
                     (cond
                       ((and param1 param2)
-                       (%get-articles-2 st-count st-data param1 param2
+                       (%get-article-list-2 st-count st-data param1 param2
                                         limit offset))
                       (param1
-                       (%get-articles-1 st-count st-data param1 
+                       (%get-article-list-1 st-count st-data param1 
                                         limit offset))
                       (else
-                       (%get-articles-0 st-count st-data limit offset)))))
+                       (%get-article-list-0 st-count st-data limit offset)))))
       (let loop ((data-in data*)
                  (data-out '()))
         (if (null? data-in)
           (values count (reverse data-out))
           (let* ((datum (car data-in))
                  (node-id (alist-ref 'node_id datum))
-                 (authors (sd:query sd:fetch-alists st-auth node-id))
-                 (series (sd:query sd:fetch st-art-series node-id))
-                 (tags (sd:query sd:fetch-all st-tags node-id))
-                 (content (%get-article-content node-id)))
-            (let* ((result*
-                     (cons
-                       `(authors . ,(falsify authors))
-                       (cons
-                         `(tags . ,(flatten tags))
-                         (cons
-                           (process-content content)
-                           (falsify datum)))))
-                   (result
-                     (if (null? series)
-                       result*
-                       (cons `(series . ,(car series)) (cons `(series_pt . ,(cadr series)) result*)))))
-              (loop (cdr data-in) (cons result data-out)))))))))
+                 (common* (%get-article-common-data stgen node-id))
+                 (content (alist-ref 'content common*))
+                 (common (alist-update 'content (process-content content) common*)) 
+                 (result (append common (falsify datum))))
+            (loop (cdr data-in) (cons result data-out)))))))))
+
+(define (%get-articles-all #!key (limit 10) (offset 0) (mk-teaser identity))
+  (%get-article-list 'all limit offset mk-teaser))
 
 (define (%get-articles-with-tag tag #!key (limit 10) (offset 0) (mk-teaser identity))
-  (%get-articles criterion: `(tag ,tag) limit: limit offset: offset mk-teaser: mk-teaser))
+  (%get-article-list `(tag ,tag) limit offset mk-teaser))
 
 (define (%get-articles-by-author author #!key (limit 10) (offset 0) (mk-teaser identity))
-  (%get-articles criterion: `(author ,author) limit: limit offset: offset mk-teaser: mk-teaser))
+  (%get-article-list `(author ,author) limit offset mk-teaser))
 
 (define (%get-articles-in-series series #!key (limit 10) (offset 0) (mk-teaser identity))
-  (%get-articles criterion: `(series ,series) limit: limit offset: offset mk-teaser: mk-teaser))
+  (%get-article-list `(series ,series) limit offset mk-teaser))
 
 (define (%get-articles-with-category category #!key (limit 10) (offset 0) (mk-teaser identity))
-  (%get-articles criterion: `(category ,category) limit: limit offset: offset mk-teaser: mk-teaser))
+  (%get-article-list `(category ,category) limit offset mk-teaser))
 
 (define (%get-articles-by-date date #!key (limit 10) (offset 0) (mk-teaser identity))
-  (%get-articles criterion: `(date ,date) limit: limit offset: offset mk-teaser: mk-teaser))
+  (let-values (((start end) (get-date-start-end date)))
+    (%get-article-list `(date-range ,start ,end) limit offset mk-teaser)))
 
 (define (%get-articles-in-date-range start end #!key (limit 10) (offset 0) (mk-teaser identity))
-  (%get-articles criterion: `(date-range ,start ,end) limit: limit offset: offset mk-teaser: mk-teaser))
+  (%get-article-list `(date-range ,start ,end) limit offset mk-teaser))
 
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
@@ -1019,7 +1042,13 @@ SQL
   (get-article-by-alias %get-article-by-alias)
   (get-article-comment-ids %get-article-comment-ids)
   (get-comment-thread %get-comment-thread)
-  (get-articles %get-articles)
+  (get-articles-all %get-articles-all)
+  (get-articles-with-tag %get-articles-with-tag)
+  (get-articles-by-author %get-articles-by-author)
+  (get-articles-in-series %get-articles-in-series)
+  (get-articles-with-category %get-articles-with-category)
+  (get-articles-by-date %get-articles-by-date)
+  (get-articles-in-date-range %get-articles-in-date-range)
   (get-ids-custom %get-ids-custom)
   #t)
 
