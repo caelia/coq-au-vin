@@ -470,7 +470,12 @@
 
 (define (get-meta-list/html subject #!optional (out (current-output-port)))
   (let* ((list-data ((db:get-meta-list subject)))
-         (ctx (cvt:make-context vars: `((subject . ,(symbol->string subject)) (metadata_items . ,list-data)))))
+         (page-vars
+           (config 'get
+                   'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
+                   'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
+         (vars `((subject . ,(symbol->string subject)) (metadata_items . ,list-data) ,@page-vars))
+         (ctx (cvt:make-context vars: vars)))
     (cvt:render "meta-list.html" ctx port: out)))
 
 (define (get-article-list/json #!optional (out (current-output-port))
