@@ -6,9 +6,11 @@
   <cvt:head>
     <cvt:locale lang="en" country="US" encoding="utf-8" />
 
+    <!-- Not being used
     <cvt:defvar name="contentPath">
       <cvt:var name="urlScheme"/>://<cvt:var name="hostName"/>/content/
     </cvt:defvar>
+    -->
 
     <!-- This doesn't work, because cvt:attr is handled outside the normal flow
     <cvt:defmacro name="articleHREF">
@@ -19,7 +21,7 @@
     <cvt:defmacro name="tagLink">
       <a>
         <cvt:attr name="href">
-          /tag/<cvt:var name="tag" format="uri" />
+          /tags/<cvt:var name="tag" format="uri" />
         </cvt:attr>
         <cvt:var name="tag" />
       </a>
@@ -66,7 +68,7 @@
   </cvt:block>
 
   <cvt:block name="styleSheets">
-    <link id="ss-main" rel="stylesheet" type="text/css" href="main.css" />
+    <link id="ss-main" rel="stylesheet" type="text/css" href="/static/style/main.css" />
   </cvt:block>
 
   <!--
@@ -91,7 +93,7 @@
         </cvt:if>
         <h3 class="articleTitle">
           <a>
-            <cvt:attr name="href"><cvt:var name="article.node_id" />.html</cvt:attr>
+            <cvt:attr name="href">/articles/<cvt:var name="article.node_id" /></cvt:attr>
             <cvt:var name="article.article_title"/>
           </a>
         </h3>
@@ -120,7 +122,7 @@
         <div class="teaser">
           <cvt:var name="article.text"/>
           <a>  
-            <cvt:attr name="href"><cvt:var name="article.node_id" />.html</cvt:attr>
+            <cvt:attr name="href">/articles/<cvt:var name="article.node_id" /></cvt:attr>
             MORE
           </a>
         </div>

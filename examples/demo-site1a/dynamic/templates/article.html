@@ -7,7 +7,7 @@
     <cvt:locale lang="en" country="US" encoding="utf-8" />
 
     <cvt:defvar name="editURL">
-      <cvt:var name="urlScheme"/>://<cvt:var name="hostName"/>/content/<cvt:var name="articleID"/>
+      /articles/<cvt:var name="articleID"/>/edit
     </cvt:defvar>
   </cvt:head>
 
@@ -51,7 +51,7 @@
   </cvt:block>
 
   <cvt:block name="styleSheets">
-    <link id="ss-main" rel="stylesheet" type="text/css" href="main.css" />
+    <link id="ss-main" rel="stylesheet" type="text/css" href="/static/style/main.css" />
   </cvt:block>
 
   <!--
@@ -101,7 +101,7 @@
       <cvt:for each="tag" in="tags" sort="alpha">
         <cvt:interpolate>, </cvt:interpolate>
         <cvt:with>
-          <cvt:defvar name="tag_url">http://this.site/tag/<cvt:var name="tag" format="uri"/></cvt:defvar>
+          <cvt:defvar name="tag_url">/tags/<cvt:var name="tag" format="uri"/></cvt:defvar>
           <a cvt:href="tag_url">
             <cvt:var name="tag"/>
           </a>

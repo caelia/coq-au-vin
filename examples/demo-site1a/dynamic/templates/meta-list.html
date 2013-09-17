@@ -6,22 +6,12 @@
   <cvt:head>
     <cvt:locale lang="en" country="US" encoding="utf-8" />
 
-    <cvt:defvar name="contentPath">
-      <cvt:var name="urlScheme"/>://<cvt:var name="hostName"/>/content/
-    </cvt:defvar>
-
-    <!-- This doesn't work, because cvt:attr is handled outside the normal flow
-    <cvt:defmacro name="articleHREF">
-      <cvt:attr name="href"><cvt:var name="article.node_id" />.html</cvt:attr>
-    </cvt:defmacro>
-    -->
-
-    <cvt:defmacro name="tagLink">
+    <cvt:defmacro name="itemLink">
       <a>
         <cvt:attr name="href">
-          /tag/<cvt:var name="tag" format="uri" />
+          /<cvt:var name="subject" format="uri"/>/<cvt:var name="item" format="uri" />
         </cvt:attr>
-        <cvt:var name="tag" />
+        <cvt:var name="item" />
       </a>
     </cvt:defmacro>
   </cvt:head>
@@ -66,7 +56,7 @@
   </cvt:block>
 
   <cvt:block name="styleSheets">
-    <link id="ss-main" rel="stylesheet" type="text/css" href="main.css" />
+    <link id="ss-main" rel="stylesheet" type="text/css" href="/static/style/main.css" />
   </cvt:block>
 
   <!--
@@ -86,12 +76,7 @@
     <ul class="MetadataList">
       <cvt:for each="item" in="metadata_items" >
         <li>
-          <a>
-            <cvt:attr name="href">
-              <cvt:var name="base_url" />/<cvt:var name="meta_cat_id" />/<cvt:var name="item" format="uri" />
-            </cvt:attr>
-            <cvt:var name="item" />
-          </a>
+          <cvt:macro name="itemLink" />
         </li>
       </cvt:for>
     </ul>
