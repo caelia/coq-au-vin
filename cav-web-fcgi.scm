@@ -40,30 +40,30 @@
     ; (logerr (with-output-to-string (lambda () (pretty-print env*))))
     (match spec
       [(or ((/ "") "GET") ((/ "articles") "GET"))
-       (send-html (get-article-list/html))]
+       (send-html (get-article-list-page/html))]
       [((/ "articles" id/alias) "GET")
        (send-html (get-article-page/html id/alias))]
       [((/ "series") "GET")
-       (send-html (get-series-list/html))]
+       (send-html (get-meta-list-page/html 'series))]
       [((/ "series" series-title) "GET")
-       (send-html (get-series-articles/html series-title))]
+       (send-html (get-article-list-page/html criterion: `(series ,series-title)))]
       [((/ "tags") "GET")
-       (send-html (get-tag-list/html))]
+       (send-html (get-meta-list-page/html 'tags))]
       [((/ "tags" tag) "GET")
-       (send-html (get-articles-with-tag/html tag))]
+       (send-html (get-article-list-page/html criterion: `(tag ,tag)))]
       [((/ "authors") "GET")
-       (send-html (get-author-list/html))]
+       (send-html (get-meta-list-page/html 'authors))]
       [((/ "authors" author) "GET")
-       (send-html (get-articles-by-author/html author))]
+       (send-html (get-article-list-page/html criterion: `(author ,author)))]
       [((/ "categories") "GET")
-       (send-html (get-category-list/html))]
-      [((/ "category" category) "GET")
-       (send-html (get-articles-by-category/html category))]
+       (send-html (get-meta-list-page/html 'categories))]
+      [((/ "categories" category) "GET")
+       (send-html (get-article-list-page/html criterion: `(category ,category)))]
       [_
         (out "Status: 404 Not Found\r\n\r\n")])))
 
 (define (run)
-  (activate-sqlite)
+  (enable-sqlite)
   (fcgi-accept-loop listen-port 0 request-handler))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
