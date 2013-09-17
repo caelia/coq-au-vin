@@ -388,7 +388,7 @@
           ((title)
            (cons (cons 'article_title val) prev))
           ((content)
-           (cons (cons 'article_body (process-body article-data)) prev))
+           (cons (cons 'text (process-body article-data)) prev))
           (else
             (let ((res (if (null? val) (cons key "") pair)))
               (cons res prev))))))
