@@ -18,11 +18,10 @@
         (import srfi-1)
         ; (import srfi-13)
 
-        ;(import (prefix cav-db db:))
         (use (prefix cav-db db:))
+        (use (prefix civet cvt:))
   
         (use lowdown)
-        (use (prefix civet cvt:))
         (use srfi-69)
         ; (use crypt)
         ; ;; FIXME: Need a better password hash! 
@@ -51,6 +50,19 @@
 (define %session-timeout% (make-parameter 900))
 
 (define %default-date-format% (make-parameter #f))
+
+         ;;; TEMPORARY!
+(define bogus-vars
+  (make-parameter
+    `((urlScheme . "http") (hostName . "quahog") (bodyMD . "") (jquerySrc . "/scripts/jquery.js")
+      (canEdit . #t) (copyright_year . 2013) (copyright_holders . "Madeleine C St Clair")
+      (rights_statement . "You have no rights") (htmlTitle . "Civet Page!") (bodyClasses . ""))))
+
+(define (get-bogus-vars #!optional (id/alias #f))
+  (let ((bogus (bogus-vars)))
+    (if id/alias
+      `((articleID . ,id/alias) ,@bogus)
+      bogus)))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -347,13 +359,41 @@
 
 (define (get-article-list-data #!key (tag #f) (author #f) (series #f)
                                (limit 10) (offset 0) (teaser-len #f))
+  #f)
   
 (define (process-body article-data)
-  (let* ((raw-body (alist-ref 'body (alist-ref 'content article-data)))
+  (let* ((content (alist-ref 'content article-data))
+         (raw-body (or (alist-ref 'body content) (alist-ref 'teaser content)))
          (sanitized-body (escape-html raw-body)))
 ;     (with-output-to-string
 ;       (lambda () (markdown->html sanitized-body)))))
     (markdown->sxml sanitized-body)))
+
+(define (prepare-article-vars article-data date-format)
+  (foldl
+    (lambda (prev pair)
+      (let ((key (car pair))
+            (val (cdr pair)))
+        (case key
+          ((authors)
+           (cons (cons 'authors val) prev))
+          ((created_dt)
+           (let* ((fmt (or date-format (%default-date-format%)))
+                  (dtstring (time->string (seconds->local-time val) fmt)))
+             (cons
+               (cons 'created_dt dtstring)
+               (cons
+                 (cons 'raw_dt val)
+                 prev))))
+          ((title)
+           (cons (cons 'article_title val) prev))
+          ((content)
+           (cons (cons 'article_body (process-body article-data)) prev))
+          (else
+            (let ((res (if (null? val) (cons key "") pair)))
+              (cons res prev))))))
+    '()
+    article-data))
 
 (define (get-article/html id/alias #!optional (out (current-output-port)))
   (let* ((article-data (get-article-data id/alias))
@@ -367,47 +407,54 @@
                                (date-format #f))
   (let* ((article-data (get-article-data id/alias))
          ; (html-body (process-body article-data))
-         (vars
-           (foldl
-             (lambda (prev pair)
-               (let ((key (car pair))
-                     (val (cdr pair)))
-                 (case key
-                   ((authors)
-                    (let* ((first (car val))
-                           (others (cdr val))
-                           (result* (cons (cons 'author first) prev)))
-                      (if (null? others)
-                        result*
-                        (cons (cons 'other_authors others) result*))))
-                   ((created_dt)
-                    (let* ((fmt (or date-format (%default-date-format%)))
-                           (dtstring (time->string (seconds->local-time val) date-format)))
-                      (cons (cons 'created_dt dtstring) prev)))
-                   ((title)
-                    (cons (cons 'article_title val) prev))
-                   ((content)
-                    (cons (cons 'article_body (process-body article-data)) prev))
-                   (else
-                     (let ((res (if (null? val) (cons key "") pair)))
-                       (cons res prev))))))
-
-             '()
-             article-data))
-         ;;; TEMPORARY!
-         (extra-vars
-            `((urlScheme . "http") (hostName . "quahog") (articleID . ,id/alias) (bodyMD . "")
-              (canEdit . #t) (copyright_year . 2013) (copyright_holders . "Madeleine C St Clair")
-              (rights_statement . "You have no rights") (htmlTitle . "Civet Page!") (bodyClasses . "")))
-         (vars* (append extra-vars vars))
-         (ctx (cvt:make-context vars: vars*)))
+         (vars* (prepare-article-vars article-data date-format))
+         (vars (append (get-bogus-vars id/alias) vars*))
+         (ctx (cvt:make-context vars: vars)))
     (cvt:render "article.html" ctx port: out)))
 
+;;; VVV FROM DEMO-LIB VVV
+; (define (get-article-list-ctx #!key (tag #f) (author #f) (limit 10))
+;   (let-values (((count list-data) ((db:get-articles) mk-teaser: text->teaser tag: tag author: author limit: limit)))
+;     (for-each
+;       (lambda (datum)
+;         (let ((id (alist-ref 'node_id datum)))
+;           (add-article id)))
+;       list-data)
+;     (let* ((list-vars (map prepare-article-vars list-data))
+;            (page-vars (get-page-vars))
+;            (vars* (cons (cons 'articles list-vars) page-vars)))
+;       (cvt:make-context vars: vars*))))
+;;; AAA FROM DEMO-LIB AAA
 
-(define (get-article-list/html #!key (out (current-output-port))
-                               (filters 'latest) (sort '(created desc))
-                               (per-page 10) (show 'teaser))
+(define (get-article-list-page/html #!key (out (current-output-port))
+                                    (criterion 'all) (sort '(created desc))
+                                    (date-format #f) (limit 10) (offset 0)
+                                    (show 'teaser))
+  (let ((mkteaser
+          (case show
+            ((teaser) text->teaser)
+            ((all) identity)
+            (else (lambda (_) "")))))
+    (let-values (((count list-data)
+                  ((db:get-article-list) criterion limit offset mkteaser)))
+      (let* ((list-vars
+               (map
+                 (lambda (datum) (prepare-article-vars datum date-format))
+                 list-data))
+             (page-vars
+               (get-bogus-vars))
+             (vars (cons (cons 'articles list-vars) page-vars))
+             (ctx (cvt:make-context vars: vars)))
+        (cvt:render "article-list.html" ctx port: out)))))
+
+(define (get-articles-by-date/html date #!key (out (current-output-port))
+                                   (sort '(created desc)) (limit 10)
+                                   (offset 0) (show 'teaser))
   #f)
+
+(define (get-meta-list/html subject #!optional (out (current-output-port)))
+  (let ((list-data ((db:get-meta-list subject))))
+    #f))
 
 (define (get-article-list/json #!optional (out (current-output-port))
                                #!key (filters 'latest) (sort '(created desc))
