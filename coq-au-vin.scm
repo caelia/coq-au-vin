@@ -197,6 +197,30 @@
                 (write-char (char-downcase chr))
                 (loop (read-char))))))))))
 
+(define (config)
+  (let ((cfg-data (%config%)))
+    (lambda (arg0 . args)
+      (cond
+        ((eqv? arg0 'all)
+         (hash-table->alist cfg-data))
+        ((eqv? arg0 'get)
+         (foldl
+           (lambda (prev key)
+             (if (hash-table-exists? cfg-data key)
+               `((key . ,(hash-table-ref cfg-data key)) ,@prev)
+               prev))
+           '()
+           args))
+        ((eqv? arg0 'set!)
+         (for-each
+           (lambda (elt)
+             (let ((k (car elt)) (v (cdr elt))) (hash-table-set! cfg-data k v)))
+           args))
+        ((null? args)
+         (hash-table-ref cfg-data arg0))
+        (else
+          (hash-table-set! cfg-data arg0 (car args)))))))
+
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 
@@ -408,23 +432,13 @@
   (let* ((article-data (get-article-data id/alias))
          ; (html-body (process-body article-data))
          (vars* (prepare-article-vars article-data date-format))
-         (vars (append (get-bogus-vars id/alias) vars*))
+         (page-vars
+           (config 'get
+                   'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
+                   'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses ))
+         (vars `((articleID . ,id/alias) ,@page-vars ,@vars*))
          (ctx (cvt:make-context vars: vars)))
     (cvt:render "article.html" ctx port: out)))
-
-;;; VVV FROM DEMO-LIB VVV
-; (define (get-article-list-ctx #!key (tag #f) (author #f) (limit 10))
-;   (let-values (((count list-data) ((db:get-articles) mk-teaser: text->teaser tag: tag author: author limit: limit)))
-;     (for-each
-;       (lambda (datum)
-;         (let ((id (alist-ref 'node_id datum)))
-;           (add-article id)))
-;       list-data)
-;     (let* ((list-vars (map prepare-article-vars list-data))
-;            (page-vars (get-page-vars))
-;            (vars* (cons (cons 'articles list-vars) page-vars)))
-;       (cvt:make-context vars: vars*))))
-;;; AAA FROM DEMO-LIB AAA
 
 (define (get-article-list-page/html #!key (out (current-output-port))
                                     (criterion 'all) (sort '(created desc))
@@ -442,8 +456,10 @@
                  (lambda (datum) (prepare-article-vars datum date-format))
                  list-data))
              (page-vars
-               (get-bogus-vars))
-             (vars (cons (cons 'articles list-vars) page-vars))
+               (config 'get
+                       'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
+                       'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses ))
+             (vars `((articles ,@list-vars) ,@page-vars))
              (ctx (cvt:make-context vars: vars)))
         (cvt:render "article-list.html" ctx port: out)))))
 
