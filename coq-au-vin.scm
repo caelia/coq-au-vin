@@ -453,8 +453,9 @@
   #f)
 
 (define (get-meta-list/html subject #!optional (out (current-output-port)))
-  (let ((list-data ((db:get-meta-list subject))))
-    #f))
+  (let* ((list-data ((db:get-meta-list subject)))
+         (ctx (cvt:make-context vars: `((subject . ,(symbol->string subject)) (metadata_items . ,list-data)))))
+    (cvt:render "meta-list.html" ctx port: out)))
 
 (define (get-article-list/json #!optional (out (current-output-port))
                                #!key (filters 'latest) (sort '(created desc))
