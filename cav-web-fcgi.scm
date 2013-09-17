@@ -63,7 +63,7 @@
         (out "Status: 404 Not Found\r\n\r\n")])))
 
 (define (run)
-  (enable-sqlite)
+  ;(enable-sqlite)
   (fcgi-accept-loop listen-port 0 request-handler))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
