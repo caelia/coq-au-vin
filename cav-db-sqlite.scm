@@ -22,7 +22,7 @@
         (use utf8)
         (use utf8-srfi-13)
         (use (prefix sql-de-lite sd:))
-        (use srfi-19)
+        ; (use srfi-19) ; I think we're using all posix date/time stuff now
         (use sets)
 
         (use cav-db)
@@ -66,22 +66,24 @@
     alist))
 
 (define (leap-year? y)
-  (or (= (modulo y 400) 0)
-      (and (= (modulo y 4) 0)
-           (not (= (modulo y 100) 0)))))
+  (let ((multiple-of? (lambda (m n) (= (modulo m n) 0))))
+    (or (multiple-of? y 400)
+        (and (multiple-of? y 4)
+             (not (multiple-of? y 100))))))
 
-(define (ymd->seconds ymd)
-  (let* ((y (- (car ymd) 1900))
-         (m (- (cadr ymd) 1))
-         (d (caddr ymd))
-         (time (vector 0 0 0 d m y 0 0 0 0)))
-    (local-time->seconds time)))
-
-(define (next-day ymd)
-  (let* ((y (car ymd))
-         (m (cadr ymd))
-         (d (caddr ymd))
-         (feb-last (if (leap-year? y) 29 28)))
+(define (next-day time)
+  (let* ((y* (vector-ref time 5))
+         (y (+ y* 1900))
+         (m* (vector-ref time 4))
+         (m (+ m* 1))
+         (d (vector-ref time 3))
+         (feb-last (if (leap-year? y) 29 28))
+         (time-out (make-vector 10))
+         (bump-month
+           (lambda ()
+             (vector-set! time-out 4 m)
+             (vector-set! time-out 3 1))))
+    (vector-copy! time time-out)
     (cond
       ((or (> m 12) (< m 1) (> d 31) (< d 1))
        (error "Invalid date."))
@@ -91,21 +93,31 @@
       ((and (= m 2) (> d feb-last))
        (error "Invalid date."))
       ((and (= m 12) (= d 31))
-       (list (+ y 1) 1 1))
+       (vector-set! time-out 5 (- y 1899))
+       (vector-set! time-out 4 0)
+       (vector-set! time-out 3 1))
       ((and (member m '(1 3 5 7 8 10)) (= d 31))
-       (list y (+ m 1) 1))
+       (bump-month))
       ((and (member m '(4 6 9 11)) (= d 30))
-       (list y (+ m 1) 1))
+       (bump-month))
       ((and (= m 2) (= d feb-last))
-       (list y (+ m 1) 1))
+       (bump-month))
       (else
-        (list y m (+ d 1))))))
+        (vector-set! time-out 3 (+ d 1))))
+    time-out))
 
-(define (parse-date isodate)
-  (map string->number (string-split isodate "-")))
+(define (iso-date->time iso)
+  (string->time iso "%F"))
 
-(define (isodate->seconds date-str)
-  (ymd->seconds (parse-date date-str)))
+(define (ymd->time y m d)
+  (iso-date->time (sprintf "~A-~A-~A" y m d)))
+
+(define (get-date-start-end start)
+  (let* ((tstart (iso-date->time start))
+         (tend (next-day tstart))
+         (starts (local-time->seconds tstart))
+         (ends (local-time->seconds tend)))
+    (values starts ends)))
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  INITIAL SETUP  ---------------------------------------------------
@@ -678,15 +690,6 @@ AND articles.node_id = ?;
 SQL
 )
 
-(define get-article-categories-query
-#<<SQL
-SELECT category FROM categories
-WHERE categories(id) = articles_x_categories(category)
-AND articles_x_categories(article) = articles(id)
-AND articles(node_id) = ?;
-SQL
-)
-
 (define get-article-comment-ids-query
 #<<SQL
 SELECT node_id FROM comments
@@ -715,10 +718,38 @@ WHERE articles_x_authors.article = articles.id AND articles_x_authors = users.id
 SQL
 )
 
+(define get-series-article-count-query
+#<<SQL
+SELECT count(*) FROM articles, series
+WHERE articles.series = series.id AND series.title = ?
+ORDER BY created_dt DESC
+LIMIT ? OFFSET ?;
+SQL
+)
+
+(define get-article-with-category-count-query
+#<<SQL
+SELECT count(*) FROM articles, articles_x_categories, categories
+WHERE articles_x_categories.article = articles.id
+  AND articles_x_categories.category = categories.id
+  AND categories.category = ?
+ORDER BY created_dt DESC
+LIMIT ? OFFSET ?;
+SQL
+)
+
+(define get-article-in-date-range-count-query
+#<<SQL
+SELECT count(*) FROM articles
+WHERE created_dt >= ? AND created_dt < ?
+ORDER BY created_dt DESC
+LIMIT ? OFFSET ?;
+SQL
+)
+
 (define get-ids-all-query
 #<<SQL
-SELECT node_id
-FROM articles
+SELECT node_id FROM articles
 ORDER BY created_dt DESC
 LIMIT ? OFFSET ?;
 SQL
@@ -726,8 +757,7 @@ SQL
 
 (define get-ids-with-tag-query
 #<<SQL
-SELECT node_id
-FROM articles, articles_x_tags, tags
+SELECT node_id FROM articles, articles_x_tags, tags
 WHERE articles_x_tags.article = articles.id AND articles_x_tags.tag = tags.id AND tags.tag = ?
 ORDER BY created_dt DESC
 LIMIT ? OFFSET ?;
@@ -736,8 +766,7 @@ SQL
 
 (define get-ids-by-author-query
 #<<SQL
-SELECT node_id
-FROM articles, articles_x_authors, users
+SELECT node_id FROM articles, articles_x_authors, users
 WHERE articles_x_authors.article = articles.id AND articles_x_authors = users.id AND users.uname = ?
 ORDER BY created_dt DESC
 LIMIT ? OFFSET ?;
@@ -746,9 +775,28 @@ SQL
 
 (define get-series-ids-query
 #<<SQL
-SELECT node_id
-FROM articles, series
+SELECT node_id FROM articles, series
 WHERE articles.series = series.id AND series.title = ?
+ORDER BY created_dt DESC
+LIMIT ? OFFSET ?;
+SQL
+)
+
+(define get-ids-with-category-query
+#<<SQL
+SELECT node_id FROM articles, articles_x_categories, categories
+WHERE articles_x_categories.article = articles.id
+  AND articles_x_categories.category = categories.id
+  AND categories.category = ?
+ORDER BY created_dt DESC
+LIMIT ? OFFSET ?;
+SQL
+)
+
+(define get-ids-in-date-range-query
+#<<SQL
+SELECT node_id FROM articles
+WHERE created_dt >= ? AND created_dt < ?
 ORDER BY created_dt DESC
 LIMIT ? OFFSET ?;
 SQL
@@ -805,6 +853,25 @@ LIMIT ? OFFSET ?;
 SQL
 )
 
+(define get-articles-in-date-range-query
+#<<SQL
+SELECT node_id, title, subtitle, created_dt, teaser_len, sticky, sticky_until
+FROM articles
+WHERE created_dt >= ? AND created_dt < ?
+ORDER BY created_dt DESC
+LIMIT ? OFFSET ?;
+SQL
+)
+
+(define get-series-list-query "SELECT title FROM series;")
+
+(define get-tag-list-query "SELECT tag FROM tags;")
+
+(define get-category-list-query "SELECT category FROM categories;")
+
+(define get-author-list-query
+  "SELECT DISTINCT uname, display_name FROM users, articles_x_authors WHERE articles_x_authors.author = users.id;")
+
 ;;; ========================================================================
 ;;; ------  Functions  -----------------------------------------------------
 
@@ -840,10 +907,10 @@ SQL
       (alist-ref sym statements))))
 
 (define common-data-queries
-  '((series . get-article-series-query)
-    (categories . get-article-categories-query)
-    (authors . get-article-authors-query)
-    (tags . get-article-tags-query)))
+  `((series . ,get-article-series-query)
+    (categories . ,get-article-categories-query)
+    (authors . ,get-article-authors-query)
+    (tags . ,get-article-tags-query)))
 
 (define (common-data-stgen/single conn)
   (statement-generator/single conn common-data-queries))
@@ -918,8 +985,8 @@ SQL
          (cadr criterion) #f))
       ((series)
        (values
-         get-article-in-series-count-query
-         get-articles-in-series-query
+         get-series-article-count-query
+         get-series-articles-query
          (cadr criterion) #f))
       ((category)
        (values
@@ -959,7 +1026,7 @@ SQL
            ;; for the future.
            (process-content
              (lambda (cont)
-               (cons 'teaser (mk-teaser (alist-ref 'body cont))))))
+               (list (cons 'teaser (mk-teaser (alist-ref 'body cont)))))))
       (let-values (((count data*)
                     (cond
                       ((and param1 param2)
@@ -1001,9 +1068,21 @@ SQL
   (let-values (((start end) (get-date-start-end date)))
     (%get-article-list `(date-range ,start ,end) limit offset mk-teaser)))
 
-(define (%get-articles-in-date-range start end #!key (limit 10) (offset 0) (mk-teaser identity))
-  (%get-article-list `(date-range ,start ,end) limit offset mk-teaser))
+(define (%get-meta-list subject)
+  (let* ((qstr
+           (case subject
+             ((series) get-series-list-query)
+             ((tags) get-tag-list-query)
+             ((categories) get-category-list-query)
+             ((authors) get-author-list-query)
+             (else (error "Invalid subject for %get-meta-list."))))
+         (conn (current-connection))
+         (st (sd:sql/transient conn qstr)))
+    (sd:query sd:fetch-all st)))
 
+
+(define (%get-ids-custom criterion)
+  #f)
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -1042,13 +1121,9 @@ SQL
   (get-article-by-alias %get-article-by-alias)
   (get-article-comment-ids %get-article-comment-ids)
   (get-comment-thread %get-comment-thread)
-  (get-articles-all %get-articles-all)
-  (get-articles-with-tag %get-articles-with-tag)
-  (get-articles-by-author %get-articles-by-author)
-  (get-articles-in-series %get-articles-in-series)
-  (get-articles-with-category %get-articles-with-category)
+  (get-article-list %get-article-list)
   (get-articles-by-date %get-articles-by-date)
-  (get-articles-in-date-range %get-articles-in-date-range)
+  (get-meta-list %get-meta-list)
   (get-ids-custom %get-ids-custom)
   #t)
 
