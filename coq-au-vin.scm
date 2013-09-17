@@ -478,6 +478,18 @@
                                (per-page 10) (show 'teaser))
   #f)
 
+(define (setup #!key (db-file #f) (open-connection #f) (content-path #f)
+               (site-path #f) (template-path #f))
+  (when db-file
+    (db:db-file db-file))
+  (when open-connection
+    (db:current-connection (open-connection)))
+  (when content-path
+    (db:content-path content-path))
+  (when site-path
+    (cvt:*site-path* site-path))
+  (when template-path
+    (cvt:*template-path* template-path)))
 
 ;; This is temporary!
 ; (define (init)
