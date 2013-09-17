@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html
+    xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:cvt="http://xmlns.therebetygers.net/civet/0.2"
+    xml:lang="en" lang="en">
+  <head>
+    <title><cvt:var name="htmlTitle"/></title>
+    <script type="text/javascript" cvt:src="jquerySrc"></script>
+    <cvt:block name="pageScripts"/>
+    <cvt:block name="styleSheets"/>
+  </head>
+  <body> 
+    <cvt:attr name="class">
+      <cvt:var name="bodyClasses"/>
+    </cvt:attr>
+    <div id="header">
+      <cvt:block name="headerContent"/>
+    </div>
+    <div id="mainRegion">
+      <div id="leftSide">
+        <cvt:block name="leftSideContent"/>
+      </div>
+      <div id="contentArea">
+        <cvt:block name="mainContent"/>
+      </div>
+      <div id="rightSide">
+        <cvt:block name="rightSideContent"/>
+      </div>
+    </div>
+    <div id="footer">
+      <cvt:block name="footerContent"/>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,31 @@
+#leftSide, #rightSide {
+  display: none;
+}
+
+#mainRegion, #header, #footer {
+  padding-left: 25%;
+  padding-right: 25%;
+}
+
+.TeaserBlock {
+  padding-bottom: .8em;
+  margin-bottom: .8em;
+  border-bottom: 2px dotted #cccc00;
+}
+
+.teaser {
+  margin-top: .5em;
+  margin-bottom: .5em;
+}
+
+.author-time {
+  font-style: italic;
+}
+
+#beginEditForm {
+  margin-top: 0.8em;
+}
+
+#header {
+  color: #ffaaff;
+}

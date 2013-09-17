@@ -1,0 +1,147 @@
+<cvt:template
+    xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:cvt="http://xmlns.therebetygers.net/civet/0.2"
+    extends="base.html">
+
+  <cvt:head>
+    <cvt:locale lang="en" country="US" encoding="utf-8" />
+
+    <cvt:defvar name="contentPath">
+      <cvt:var name="urlScheme"/>://<cvt:var name="hostName"/>/content/
+    </cvt:defvar>
+
+    <!-- This doesn't work, because cvt:attr is handled outside the normal flow
+    <cvt:defmacro name="articleHREF">
+      <cvt:attr name="href"><cvt:var name="article.node_id" />.html</cvt:attr>
+    </cvt:defmacro>
+    -->
+
+    <cvt:defmacro name="tagLink">
+      <a>
+        <cvt:attr name="href">
+          /tag/<cvt:var name="tag" format="uri" />
+        </cvt:attr>
+        <cvt:var name="tag" />
+      </a>
+    </cvt:defmacro>
+  </cvt:head>
+
+  <cvt:block name="pageScripts">
+    <script type="text/javascript">
+      var dirty = false;
+      var bodyMD = "<cvt:var name="bodyMD"/>";
+      var bodyDiv;
+      var bodyHTML;
+      var canEdit = <cvt:var name="canEdit" type="boolean" format="ls"/>;
+    
+      function showEditButton() {
+      }
+      
+      function beginEditing() {
+        bodyDiv.empty();
+      }
+    
+      function discardChanges() {
+      }
+  
+      function previewChanges() {
+      }
+  
+      function submitChanges() {
+      }
+  
+      function setupForAJAX() {
+        $("#beginEditForm").removeAttr("action");
+        $("#beginEditForm").removeAttr("method");
+      }
+  
+      $(document).ready(function () {
+        bodyDiv = $("#articleBody");
+        bodyHTML = bodyDiv.html();
+        if (canEdit) {
+          showEditButton();
+        }
+      });
+    </script>
+  </cvt:block>
+
+  <cvt:block name="styleSheets">
+    <link id="ss-main" rel="stylesheet" type="text/css" href="main.css" />
+  </cvt:block>
+
+  <!--
+  <cvt:block name="bodyClass">SingleArticle</cvt:block>
+  -->
+  
+  <cvt:block name="headerContent">
+    <h1>A R T I C L E &#xa0; L I S T &#xa0; P A G E</h1>
+  </cvt:block>
+  
+  <cvt:block name="leftSideContent">
+    <em>Left</em>
+  </cvt:block>
+  
+  <cvt:block name="mainContent">
+    <!-- <cvt:for each="article" in="articles" sort="numeric" sort-field="raw_dt" order="desc"> -->
+    <!-- Already sorted by SQL query. -->
+    <cvt:for each="article" in="articles" sort="none">
+      <div class="TeaserBlock">
+        <cvt:if test="article.series">
+          <h4 class="seriesTitle"><cvt:var name="article.series"/><cvt:if test="article.series_pt">, Part <cvt:var name="article.series_pt"/></cvt:if></h4>
+        </cvt:if>
+        <h3 class="articleTitle">
+          <a>
+            <cvt:attr name="href"><cvt:var name="article.node_id" />.html</cvt:attr>
+            <cvt:var name="article.article_title"/>
+          </a>
+        </h3>
+        <cvt:if test="subtitle">
+          <h5 class="articleSubTitle"><cvt:var name="article.subtitle"/></h5>
+        </cvt:if>
+        <div class="author-time">
+          <span class="authors">
+            <cvt:for each="awthur" in="article.authors" sort="alpha" sort-field="uname">
+              <cvt:interpolate mode="pair"> &amp; </cvt:interpolate>
+              <cvt:interpolate mode="last">, &amp; </cvt:interpolate>
+              <cvt:interpolate>, </cvt:interpolate>
+              <cvt:if test="awthur.display_name">
+                <cvt:var name="awthur.display_name" />
+                <cvt:else>
+                  <cvt:var name="awthur.uname" />
+                </cvt:else>
+              </cvt:if>
+            </cvt:for>
+          </span>
+          |
+          <span class="created">
+            <cvt:var name="article.created_dt" />
+          </span>
+        </div>
+        <div class="teaser">
+          <cvt:var name="article.text"/>
+          <a>  
+            <cvt:attr name="href"><cvt:var name="article.node_id" />.html</cvt:attr>
+            MORE
+          </a>
+        </div>
+        <div class="tags">
+          Tags:
+          <cvt:for each="tag" in="article.tags" sort="alpha">
+            <cvt:interpolate>, </cvt:interpolate>
+            <cvt:macro name="tagLink" />
+          </cvt:for>
+        </div>
+      </div>
+    </cvt:for>
+  </cvt:block>
+  
+  <cvt:block name="rightSideContent">
+    <em>Right</em>
+  </cvt:block>
+  
+  <cvt:block name="footerContent">
+    <p class="copyrightNotice">
+      Copyright © <cvt:var name="copyright_year"/> by <cvt:var name="copyright_holders"/>. <cvt:var name="rights_statement"/>.
+    </p>
+  </cvt:block>
+</cvt:template>

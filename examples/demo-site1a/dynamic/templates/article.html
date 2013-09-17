@@ -1,0 +1,126 @@
+<cvt:template
+    xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:cvt="http://xmlns.therebetygers.net/civet/0.2"
+    extends="base.html">
+
+  <cvt:head>
+    <cvt:locale lang="en" country="US" encoding="utf-8" />
+
+    <cvt:defvar name="editURL">
+      <cvt:var name="urlScheme"/>://<cvt:var name="hostName"/>/content/<cvt:var name="articleID"/>
+    </cvt:defvar>
+  </cvt:head>
+
+  <cvt:block name="pageScripts">
+    <script type="text/javascript">
+      var dirty = false;
+      var bodyMD = "<cvt:var name="bodyMD"/>";
+      var bodyDiv;
+      var bodyHTML;
+      var canEdit = <cvt:var name="canEdit" type="boolean" format="ls"/>;
+    
+      function showEditButton() {
+      }
+      
+      function beginEditing() {
+        bodyDiv.empty();
+      }
+    
+      function discardChanges() {
+      }
+  
+      function previewChanges() {
+      }
+  
+      function submitChanges() {
+      }
+  
+      function setupForAJAX() {
+        $("#beginEditForm").removeAttr("action");
+        $("#beginEditForm").removeAttr("method");
+      }
+  
+      $(document).ready(function () {
+        bodyDiv = $("#articleBody");
+        bodyHTML = bodyDiv.html();
+        if (canEdit) {
+          showEditButton();
+        }
+      });
+    </script>
+  </cvt:block>
+
+  <cvt:block name="styleSheets">
+    <link id="ss-main" rel="stylesheet" type="text/css" href="main.css" />
+  </cvt:block>
+
+  <!--
+  <cvt:block name="bodyClass">SingleArticle</cvt:block>
+  -->
+  
+  <cvt:block name="headerContent">
+    <h1>S I N G L E &#xa0; A R T I C L E &#xa0; P A G E</h1>
+  </cvt:block>
+  
+  <cvt:block name="leftSideContent">
+    <em>Left</em>
+  </cvt:block>
+  
+  <cvt:block name="mainContent">
+    <cvt:if test="series">
+      <h4 class="seriesTitle"><cvt:var name="series"/><cvt:if test="series_pt">, Part <cvt:var name="series_pt"/></cvt:if></h4>
+    </cvt:if>
+    <h3 class="articleTitle"><cvt:var name="article_title"/></h3>
+    <cvt:if test="subtitle">
+      <h5 id="articleSubTitle"><cvt:var name="subtitle"/></h5>
+    </cvt:if>
+    <div class="author-time">
+      <span class="authors">
+        <cvt:for each="awthur" in="authors" sort="alpha" sort-field="uname">
+          <cvt:interpolate mode="pair">&amp; </cvt:interpolate>
+          <cvt:interpolate mode="last">, &amp; </cvt:interpolate>
+          <cvt:interpolate>, </cvt:interpolate>
+          <cvt:if test="awthur.display_name">
+            <cvt:var name="awthur.display_name" />
+            <cvt:else>
+              <cvt:var name="awthur.uname" />
+            </cvt:else>
+          </cvt:if>
+        </cvt:for>
+      </span>
+      |
+      <span class="created">
+        <cvt:var name="created_dt" />
+      </span>
+    </div>
+    <div class="articleBody">
+      <cvt:var name="text"/>
+    </div>
+    <div class="articleTags">
+      <strong>Tags:</strong>
+      <cvt:for each="tag" in="tags" sort="alpha">
+        <cvt:interpolate>, </cvt:interpolate>
+        <cvt:with>
+          <cvt:defvar name="tag_url">http://this.site/tag/<cvt:var name="tag" format="uri"/></cvt:defvar>
+          <a cvt:href="tag_url">
+            <cvt:var name="tag"/>
+          </a>
+        </cvt:with>
+      </cvt:for>
+    </div>
+    <form id="beginEditForm" cvt:action="editURL" method="POST">
+      <input id="returnTo" name="returnTo" type="hidden" cvt:value="currentPath" />
+      <button id="editButton" name="editButton" type="submit">Edit</button>
+    </form>
+  </cvt:block>
+  
+  <cvt:block name="rightSideContent">
+    <em>Right</em>
+  </cvt:block>
+  
+  <cvt:block name="footerContent">
+    <p class="copyrightNotice">
+      Copyright © <cvt:var name="copyright_year"/> by <cvt:var name="copyright_holders"/>. <cvt:var name="rights_statement"/>.
+    </p>
+  </cvt:block>
+</cvt:template>
