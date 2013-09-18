@@ -1068,6 +1068,7 @@ SQL
   (let-values (((start end) (get-date-start-end date)))
     (%get-article-list `(date-range ,start ,end) limit offset mk-teaser)))
 
+;;; FIXME: design a more general method for mapping DB names to id/label
 (define (%get-meta-list subject)
   (let* ((qstr
            (case subject
@@ -1076,10 +1077,21 @@ SQL
              ((categories) get-category-list-query)
              ((authors) get-author-list-query)
              (else (error "Invalid subject for %get-meta-list."))))
+         (post-proc
+           (if (eqv? subject 'authors)
+             (lambda (a)
+               (let ((u (alist-ref 'uname a))
+                     (d (alist-ref 'display_name a)))
+                 (if (null? d)
+                   `((id . ,u) (label . ,u))
+                   `((id . ,u) (label . ,d)))))
+             (lambda (x)
+               (let ((val (cdar x)))
+                 `((id . ,val) (label . ,val))))))
          (conn (current-connection))
-         (st (sd:sql/transient conn qstr)))
-    (sd:query sd:fetch-all st)))
-
+         (st (sd:sql/transient conn qstr))
+         (raw-data (sd:query sd:fetch-alists st)))
+    (map post-proc raw-data)))
 
 (define (%get-ids-custom criterion)
   #f)
