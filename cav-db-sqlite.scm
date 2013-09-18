@@ -714,7 +714,7 @@ SQL
 (define get-article-by-author-count-query
 #<<SQL
 SELECT count(*) FROM articles, articles_x_authors, users
-WHERE articles_x_authors.article = articles.id AND articles_x_authors = users.id AND users.uname = ?
+WHERE articles_x_authors.article = articles.id AND articles_x_authors.author = users.id AND users.uname = ?
 SQL
 )
 
@@ -767,7 +767,7 @@ SQL
 (define get-ids-by-author-query
 #<<SQL
 SELECT node_id FROM articles, articles_x_authors, users
-WHERE articles_x_authors.article = articles.id AND articles_x_authors = users.id AND users.uname = ?
+WHERE articles_x_authors.article = articles.id AND articles_x_authors.author = users.id AND users.uname = ?
 ORDER BY created_dt DESC
 LIMIT ? OFFSET ?;
 SQL
@@ -825,7 +825,7 @@ SQL
 #<<SQL
 SELECT node_id, title, subtitle, created_dt, teaser_len, sticky, sticky_until
 FROM articles, articles_x_authors, users
-WHERE articles_x_authors.article = articles.id AND articles_x_authors = users.id AND users.uname = ?
+WHERE articles_x_authors.article = articles.id AND articles_x_authors.author = users.id AND users.uname = ?
 ORDER BY created_dt DESC
 LIMIT ? OFFSET ?;
 SQL
