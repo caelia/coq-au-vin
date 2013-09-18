@@ -51,19 +51,19 @@
       [((/ "articles" id/alias) "GET")
        (send-html (get-article-page/html id/alias out: #f))]
       [((or (/ "series") (/ "series" "")) "GET")
-       (send-html (get-meta-list-page/html 'series out: #f))]
+       (send-html (get-meta-list-page/html 'series #f))]
       [((/ "series" series-title) "GET")
        (send-html (get-article-list-page/html criterion: `(series ,series-title) out: #f))]
       [((or (/ "tags") (/ "tags" "")) "GET")
-       (send-html (get-meta-list-page/html 'tags out: #f))]
+       (send-html (get-meta-list-page/html 'tags #f))]
       [((/ "tags" tag) "GET")
        (send-html (get-article-list-page/html criterion: `(tag ,tag) out: #f))]
       [((or (/ "authors") (/ "authors" "")) "GET")
-       (send-html (get-meta-list-page/html 'authors out: #f))]
+       (send-html (get-meta-list-page/html 'authors #f))]
       [((/ "authors" author) "GET")
        (send-html (get-article-list-page/html criterion: `(author ,author) out: #f))]
       [((or (/ "categories") (/ "categories" "")) "GET")
-       (send-html (get-meta-list-page/html 'categories out: #f))]
+       (send-html (get-meta-list-page/html 'categories #f))]
       [((/ "categories" category) "GET")
        (send-html (get-article-list-page/html criterion: `(category ,category) out: #f))]
       [_
