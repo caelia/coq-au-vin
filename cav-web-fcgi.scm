@@ -16,6 +16,13 @@
       (string->number env-port)
       3125)))
 
+(define (log-obj msg obj #!optional (logfile "obj.log"))
+  (with-output-to-file
+    logfile
+    (lambda ()
+      (print msg)
+      (pp obj))))
+
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ------------------------------------------------------------------------
 
@@ -23,7 +30,7 @@
   (let* ((env* (env))
          (method (alist-ref "REQUEST_METHOD" env* string=?))
          (path-str (alist-ref "REQUEST_URI" env* string=?))
-         (path (uri-reference path-str))
+         (path (uri-path (uri-reference path-str)))
          (spec (list path method))
          (send-page
            (lambda (type data)
@@ -40,25 +47,25 @@
     ; (logerr (with-output-to-string (lambda () (pretty-print env*))))
     (match spec
       [(or ((/ "") "GET") ((/ "articles") "GET"))
-       (send-html (get-article-list-page/html))]
+       (send-html (get-article-list-page/html out: #f))]
       [((/ "articles" id/alias) "GET")
-       (send-html (get-article-page/html id/alias))]
+       (send-html (get-article-page/html id/alias out: #f))]
       [((/ "series") "GET")
-       (send-html (get-meta-list-page/html 'series))]
+       (send-html (get-meta-list-page/html 'series out: #f))]
       [((/ "series" series-title) "GET")
-       (send-html (get-article-list-page/html criterion: `(series ,series-title)))]
+       (send-html (get-article-list-page/html criterion: `(series ,series-title) out: #f))]
       [((/ "tags") "GET")
-       (send-html (get-meta-list-page/html 'tags))]
+       (send-html (get-meta-list-page/html 'tags out: #f))]
       [((/ "tags" tag) "GET")
-       (send-html (get-article-list-page/html criterion: `(tag ,tag)))]
+       (send-html (get-article-list-page/html criterion: `(tag ,tag) out: #f))]
       [((/ "authors") "GET")
-       (send-html (get-meta-list-page/html 'authors))]
+       (send-html (get-meta-list-page/html 'authors out: #f))]
       [((/ "authors" author) "GET")
-       (send-html (get-article-list-page/html criterion: `(author ,author)))]
+       (send-html (get-article-list-page/html criterion: `(author ,author) out: #f))]
       [((/ "categories") "GET")
-       (send-html (get-meta-list-page/html 'categories))]
+       (send-html (get-meta-list-page/html 'categories out: #f))]
       [((/ "categories" category) "GET")
-       (send-html (get-article-list-page/html criterion: `(category ,category)))]
+       (send-html (get-article-list-page/html criterion: `(category ,category) out: #f))]
       [_
         (out "Status: 404 Not Found\r\n\r\n")])))
 
