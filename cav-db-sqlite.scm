@@ -827,7 +827,7 @@ SQL
 
 (define get-series-articles-query
 #<<SQL
-SELECT node_id, title, subtitle, created_dt, teaser_len, sticky, sticky_until
+SELECT node_id, articles.title, subtitle, created_dt, teaser_len, sticky, sticky_until
 FROM articles, series
 WHERE articles.series = series.id AND series.title = ?
 ORDER BY created_dt DESC
