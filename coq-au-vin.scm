@@ -481,7 +481,7 @@
   #f)
 
 (define (get-meta-list-page/html subject #!optional (out (current-output-port)))
-  (let* ((list-data ((db:get-meta-list subject)))
+  (let* ((list-data ((db:get-meta-list) subject))
          (page-vars
            (config-get
              'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
