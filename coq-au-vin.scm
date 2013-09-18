@@ -51,6 +51,8 @@
 
 (define %default-date-format% (make-parameter #f))
 
+(define %object-log% (make-parameter #f))
+
          ;;; TEMPORARY!
 (define bogus-vars
   (make-parameter
@@ -197,29 +199,31 @@
                 (write-char (char-downcase chr))
                 (loop (read-char))))))))))
 
-(define (config)
+(define (config-set! . vars)
   (let ((cfg-data (%config%)))
-    (lambda (arg0 . args)
-      (cond
-        ((eqv? arg0 'all)
-         (hash-table->alist cfg-data))
-        ((eqv? arg0 'get)
-         (foldl
-           (lambda (prev key)
-             (if (hash-table-exists? cfg-data key)
-               `((key . ,(hash-table-ref cfg-data key)) ,@prev)
-               prev))
-           '()
-           args))
-        ((eqv? arg0 'set!)
-         (for-each
-           (lambda (elt)
-             (let ((k (car elt)) (v (cdr elt))) (hash-table-set! cfg-data k v)))
-           args))
-        ((null? args)
-         (hash-table-ref cfg-data arg0))
-        (else
-          (hash-table-set! cfg-data arg0 (car args)))))))
+    (for-each
+      (lambda (elt)
+        (let ((k (car elt)) (v (cdr elt))) (hash-table-set! cfg-data k v)))
+      vars)))
+
+(define (config-get . vars)
+  (let ((cfg-data (%config%)))
+    (foldl
+      (lambda (prev key)
+        (if (hash-table-exists? cfg-data key)
+          `((,key . ,(hash-table-ref cfg-data key)) ,@prev)
+          prev))
+      '()
+      vars)))
+
+(define (config key . vals)
+  (let ((cfg-data (%config%)))
+    (if (null? vals)
+      (hash-table-ref cfg-data key)
+      (hash-table-set! cfg-data key (car vals)))))
+
+(define (config*)
+  (hash-table->alist (%config%)))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -433,9 +437,9 @@
          ; (html-body (process-body article-data))
          (vars* (prepare-article-vars article-data date-format))
          (page-vars
-           (config 'get
-                   'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
-                   'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses ))
+           (config-get
+             'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
+             'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
          (vars `((articleID . ,id/alias) ,@page-vars ,@vars*))
          (ctx (cvt:make-context vars: vars)))
     (cvt:render "article.html" ctx port: out)))
@@ -456,9 +460,9 @@
                  (lambda (datum) (prepare-article-vars datum date-format))
                  list-data))
              (page-vars
-               (config 'get
-                       'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
-                       'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses ))
+               (config-get
+                 'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
+                 'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
              (vars `((articles ,@list-vars) ,@page-vars))
              (ctx (cvt:make-context vars: vars)))
         (cvt:render "article-list.html" ctx port: out)))))
@@ -468,12 +472,12 @@
                                    (offset 0) (show 'teaser))
   #f)
 
-(define (get-meta-list/html subject #!optional (out (current-output-port)))
+(define (get-meta-list-page/html subject #!optional (out (current-output-port)))
   (let* ((list-data ((db:get-meta-list subject)))
          (page-vars
-           (config 'get
-                   'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
-                   'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
+           (config-get
+             'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
+             'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
          (vars `((subject . ,(symbol->string subject)) (metadata_items . ,list-data) ,@page-vars))
          (ctx (cvt:make-context vars: vars)))
     (cvt:render "meta-list.html" ctx port: out)))
