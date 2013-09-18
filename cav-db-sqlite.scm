@@ -707,23 +707,21 @@ SQL
 (define get-article-with-tag-count-query
 #<<SQL
 SELECT count(*) FROM articles, articles_x_tags, tags
-WHERE articles_x_tags.article = articles.id AND articles_x_tags.tag = tags.id AND tags.tag = ?
+WHERE articles_x_tags.article = articles.id AND articles_x_tags.tag = tags.id AND tags.tag = ?;
 SQL
 )
 
 (define get-article-by-author-count-query
 #<<SQL
 SELECT count(*) FROM articles, articles_x_authors, users
-WHERE articles_x_authors.article = articles.id AND articles_x_authors.author = users.id AND users.uname = ?
+WHERE articles_x_authors.article = articles.id AND articles_x_authors.author = users.id AND users.uname = ?;
 SQL
 )
 
 (define get-series-article-count-query
 #<<SQL
 SELECT count(*) FROM articles, series
-WHERE articles.series = series.id AND series.title = ?
-ORDER BY created_dt DESC
-LIMIT ? OFFSET ?;
+WHERE articles.series = series.id AND series.title = ?;
 SQL
 )
 
@@ -732,18 +730,14 @@ SQL
 SELECT count(*) FROM articles, articles_x_categories, categories
 WHERE articles_x_categories.article = articles.id
   AND articles_x_categories.category = categories.id
-  AND categories.category = ?
-ORDER BY created_dt DESC
-LIMIT ? OFFSET ?;
+  AND categories.category = ?;
 SQL
 )
 
 (define get-article-in-date-range-count-query
 #<<SQL
 SELECT count(*) FROM articles
-WHERE created_dt >= ? AND created_dt < ?
-ORDER BY created_dt DESC
-LIMIT ? OFFSET ?;
+WHERE created_dt >= ? AND created_dt < ?;
 SQL
 )
 
