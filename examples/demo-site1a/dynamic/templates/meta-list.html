@@ -9,9 +9,9 @@
     <cvt:defmacro name="itemLink">
       <a>
         <cvt:attr name="href">
-          /<cvt:var name="subject" format="uri"/>/<cvt:var name="item" format="uri" />
+          /<cvt:var name="subject" format="uri"/>/<cvt:var name="item.id" format="uri" />
         </cvt:attr>
-        <cvt:var name="item" />
+        <cvt:var name="item.label" />
       </a>
     </cvt:defmacro>
   </cvt:head>
@@ -74,7 +74,7 @@
   <cvt:block name="mainContent">
     <h3 ><cvt:var name="subject" /></h3>
     <ul class="MetadataList">
-      <cvt:for each="item" in="metadata_items" >
+      <cvt:for each="item" in="metadata_items" sort-field="label">
         <li>
           <cvt:macro name="itemLink" />
         </li>
