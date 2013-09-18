@@ -51,7 +51,7 @@
 
 (define %default-date-format% (make-parameter #f))
 
-(define %object-log% (make-parameter #f))
+(define %object-log-file% (make-parameter "obj.log"))
 
          ;;; TEMPORARY!
 (define bogus-vars
@@ -75,6 +75,14 @@
 
 (define (eprintf fmt . args)
   (error (apply sprintf (cons fmt args))))
+
+(define (log-obj msg obj #!optional (logfile (%object-log-file%)))
+  (with-output-to-file
+    logfile
+    (lambda ()
+      (print msg)
+      (pp obj))
+    #:append))
  
 (define (strip-html str)
   (let* ((in-tag #f)
