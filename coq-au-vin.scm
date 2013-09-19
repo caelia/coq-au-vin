@@ -495,8 +495,8 @@
                                (per-page 10) (show 'teaser))
   #f)
 
-(define (setup #!key (db-file #f) (open-connection #f) (content-path #f)
-               (site-path #f) (template-path #f))
+(define (app-init #!key (db-file #f) (open-connection #f) (content-path #f)
+                  (site-path #f) (template-path #f))
   (when db-file
     (db:db-file db-file))
   (when open-connection
