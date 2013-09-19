@@ -23,7 +23,6 @@
         (use utf8-srfi-13)
         (use (prefix sql-de-lite sd:))
         ; (use srfi-19) ; I think we're using all posix date/time stuff now
-        (use sets)
 
         (use cav-db)
         ; Just for initial development phase
