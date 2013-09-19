@@ -9,7 +9,6 @@
 
 (module cav-db-sqlite
         *
-        ; (activate-sqlite open-database close-database)
 
         (import scheme chicken)
         (import extras)
@@ -22,12 +21,8 @@
         (use utf8)
         (use utf8-srfi-13)
         (use (prefix sql-de-lite sd:))
-        ; (use srfi-19) ; I think we're using all posix date/time stuff now
 
         (use cav-db)
-        ; Just for initial development phase
-        ; (require-library cav-db)
-        ; (import cav-db)
 
 ; These 4 params probably only needed in cav-db
 ; (define current-connection (make-parameter #f))
@@ -242,7 +237,7 @@ SQL
 ;;; ========================================================================
 ;;; ------  Functions  -----------------------------------------------------
 
-(define (%setup-db filename #!optional (force #f))
+(define (setup-db filename #!optional (force #f))
   (when (file-exists? filename)
     (if force
       (delete-file filename)
@@ -1093,7 +1088,6 @@ SQL
 
 
 (define (enable-sqlite)
-  (setup-db %setup-db)
   (add-role %add-role)
   (delete-role %delete-role)
   (add-user %add-user)
