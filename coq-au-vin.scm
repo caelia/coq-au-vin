@@ -35,6 +35,7 @@
         (use utf8-srfi-13)
         (use utf8-srfi-14)
 
+        (use uri-common)
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  GLOBAL PARAMETERS  -----------------------------------------------
@@ -388,6 +389,8 @@
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; --  WEB INTERFACE  -----------------------------------------------------
 
+;;; ------  Lo-level  ------------------------------------------------------
+
 (define (get-article-data id/alias)
   (if (node-id? id/alias)
     ((db:get-article-by-nodeid) id/alias)
@@ -430,6 +433,15 @@
               (cons res prev))))))
     '()
     article-data))
+
+(define (process-post-data pd)
+  (let* ((fields (string-split pd "&"))
+         (kvs (map (lambda (f) (string-split f "="))))
+         (alst (map (lambda (kv) `(,(string->symbol (car kv)) . ,(cadr kv))) kvs))
+
+
+;;; ========================================================================
+;;; ------  Hi-level  ------------------------------------------------------
 
 (define (get-article/html id/alias #!optional (out (current-output-port)))
   (let* ((article-data (get-article-data id/alias))
