@@ -54,19 +54,6 @@
 
 (define %object-log-file% (make-parameter "obj.log"))
 
-         ;;; TEMPORARY!
-(define bogus-vars
-  (make-parameter
-    `((urlScheme . "http") (hostName . "quahog") (bodyMD . "") (jquerySrc . "/scripts/jquery.js")
-      (canEdit . #t) (copyright_year . 2013) (copyright_holders . "Madeleine C St Clair")
-      (rights_statement . "You have no rights") (htmlTitle . "Civet Page!") (bodyClasses . ""))))
-
-(define (get-bogus-vars #!optional (id/alias #f))
-  (let ((bogus (bogus-vars)))
-    (if id/alias
-      `((articleID . ,id/alias) ,@bogus)
-      bogus)))
-
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 
