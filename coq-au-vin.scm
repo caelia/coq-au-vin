@@ -434,12 +434,6 @@
     '()
     article-data))
 
-(define (process-post-data pd)
-  (let* ((fields (string-split pd "&"))
-         (kvs (map (lambda (f) (string-split f "="))))
-         (alst (map (lambda (kv) `(,(string->symbol (car kv)) . ,(cadr kv))) kvs))
-
-
 ;;; ========================================================================
 ;;; ------  Hi-level  ------------------------------------------------------
 
@@ -507,14 +501,7 @@
                                (per-page 10) (show 'teaser))
   #f)
 
-(define (app-init #!key (db-file #f) (open-connection #f) (content-path #f)
-                  (site-path #f) (template-path #f))
-  (when db-file
-    (db:db-file db-file))
-  (when open-connection
-    (db:current-connection (open-connection)))
-  (when content-path
-    (db:content-path content-path))
+(define (app-init #!key (site-path #f) (template-path #f))
   (when site-path
     (cvt:*site-path* site-path))
   (when template-path

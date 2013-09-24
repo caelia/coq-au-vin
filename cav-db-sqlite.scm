@@ -39,6 +39,8 @@
 
 (define %db-file% (make-parameter #f))
 
+(define %content-path% (make-parameter #f))
+
 (define (falsify alist)
   (map
     (lambda (pair)
@@ -880,7 +882,7 @@ SQL
 
 ; (define (get-article-content node-id #!optional (out #f))
 (define (%get-article-content node-id)
-  (let ((article-path (make-pathname (content-path) node-id))) 
+  (let ((article-path (make-pathname (%content-path%) node-id))) 
     `((body . ,(%get-article-body article-path)))))
 
 (define (statement-generator/single conn queries)
@@ -1093,14 +1095,21 @@ SQL
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 
-(define (enable-sqlite dbfile)
+(define (enable-sqlite dbfile content-path)
   (let* ((file
            (if (absolute-pathname? dbfile)
              dbfile
              (normalize-pathname (make-pathname (current-directory) dbfile))))
          (%connect
-           (lambda () (current-connection (sd:open-database (%db-file%))))))
+           (lambda () (current-connection (sd:open-database (%db-file%)))))
+         (cpath
+           (if (absolute-pathname? content-path)
+             content-path
+             (normalize-pathname (make-pathname (current-directory) content-path)))))
+    ;; SQLite-specific parameters
     (%db-file% file)
+    (%content-path% cpath)
+    ;; Generic DB parameters
     (add-role %add-role)
     (delete-role %delete-role)
     (add-user %add-user)

@@ -20,8 +20,6 @@
 
 (define first-id (make-parameter (lambda (_) 0)))
 
-(define content-path (make-parameter #f))
-
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  USERS, ROLES, AUTHENTICATION, & SESSIONS  ------------------------
