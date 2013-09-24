@@ -112,6 +112,8 @@
 
 (define get-ids-custom (make-parameter #f))
 
+(define get-last-id (make-parameter #f))
+
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 

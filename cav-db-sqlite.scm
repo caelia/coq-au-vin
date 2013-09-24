@@ -740,6 +740,14 @@ WHERE created_dt >= ? AND created_dt < ?;
 SQL
 )
 
+(define get-last-id-query
+#<<SQL
+SELECT node_id FROM articles
+ORDER BY node_id DESC
+LIMIT 1 OFFSET 0;
+SQL
+)
+
 (define get-ids-all-query
 #<<SQL
 SELECT node_id FROM articles
@@ -1086,6 +1094,11 @@ SQL
          (raw-data (sd:query sd:fetch-alists st)))
     (map post-proc raw-data)))
 
+(define (%get-last-id)
+  (let* ((conn (current-connection))
+         (st (sql/transient conn get-last-id-query)))
+    (query fetch st)))
+
 (define (%get-ids-custom criterion)
   #f)
 
@@ -1146,6 +1159,7 @@ SQL
     (get-articles-by-date %get-articles-by-date)
     (get-meta-list %get-meta-list)
     (get-ids-custom %get-ids-custom)
+    (get-last-id %get-last-id)
     (connect %connect)
     (disconnect %disconnect)
     #t)
