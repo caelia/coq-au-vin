@@ -54,6 +54,8 @@
 
 (define %object-log-file% (make-parameter "obj.log"))
 
+(define %first-node-id% (make-parameter "10000001"))
+
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 
@@ -132,6 +134,19 @@
       ((string=? s "true") #t)
       ((string=? s "false") #t)
       (eprintf "'~A' does not represent a boolean value.\n"))))
+
+;;; Uh-oh: this ceases to work when there are more than 805,306,366 nodes!
+(define (next-node-id nid)
+  (let* ((hexstr (string-append "#x" nid))
+         (numeric (string->number hexstr))
+         (next (+ numeric 1)))
+    (sprintf "~X" next)))
+
+(define (get-node-id) 
+  (let ((last-nid ((db:get-last-id))))
+    (if (null? last-nid)
+      (%first-node-id%)
+      (next-node-id (car last-nid)))))
 
 ; This is not absolutely foolproof, but I think it's close enough
 (define (node-id? s)
@@ -434,6 +449,7 @@
 
 (define (get-article-page/html id/alias #!key (out (current-output-port))
                                (date-format #f))
+  ((db:connect))
   (let* ((article-data (get-article-data id/alias))
          ; (html-body (process-body article-data))
          (vars* (prepare-article-vars article-data date-format))
@@ -443,12 +459,14 @@
              'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
          (vars `((articleID . ,id/alias) ,@page-vars ,@vars*))
          (ctx (cvt:make-context vars: vars)))
+    ((db:disconnect))
     (cvt:render "article.html" ctx port: out)))
 
 (define (get-article-list-page/html #!key (out (current-output-port))
                                     (criterion 'all) (sort '(created desc))
                                     (date-format #f) (limit 10) (offset 0)
                                     (show 'teaser))
+  ((db:connect))
   (let ((mkteaser
           (case show
             ((teaser) text->teaser)
@@ -466,6 +484,7 @@
                  'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
              (vars `((articles ,@list-vars) ,@page-vars))
              (ctx (cvt:make-context vars: vars)))
+        ((db:disconnect))
         (cvt:render "article-list.html" ctx port: out)))))
 
 (define (get-articles-by-date/html date #!key (out (current-output-port))
@@ -474,6 +493,7 @@
   #f)
 
 (define (get-meta-list-page/html subject #!optional (out (current-output-port)))
+  ((db:connect))
   (let* ((list-data ((db:get-meta-list) subject))
          (page-vars
            (config-get
@@ -481,6 +501,7 @@
              'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
          (vars `((subject . ,(symbol->string subject)) (metadata_items . ,list-data) ,@page-vars))
          (ctx (cvt:make-context vars: vars)))
+    ((db:disconnect))
     (cvt:render "meta-list.html" ctx port: out)))
 
 (define (get-article-list/json #!optional (out (current-output-port))
@@ -488,22 +509,17 @@
                                (per-page 10) (show 'teaser))
   #f)
 
+; (define (add-article form-data)
+;   ((db:connect))
+;   (let ((nid (get-node-id)))
+
+
 (define (app-init #!key (site-path #f) (template-path #f))
   (when site-path
     (cvt:*site-path* site-path))
   (when template-path
     (cvt:*template-path* template-path)))
 
-;; This is temporary!
-; (define (init)
-;   (activate-sqlite)
-;   (db:dbfile "examples/demo-site1/data/preloaded.db")
-;   (db:current-connection (open-database "examples/demo-site1/data/preloaded.db"))
-;   (db:content-path "examples/demo-site1/data/content")
-;   (cvt:*site-path* "examples/demo-site1/dynamic"))
-; 
-; (define (shut-it)
-;   (close-database (db:current-connection)))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
