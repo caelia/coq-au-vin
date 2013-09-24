@@ -1096,14 +1096,17 @@ SQL
 
 (define (%get-last-id)
   (let* ((conn (current-connection))
-         (st (sql/transient conn get-last-id-query)))
-    (query fetch st)))
+         (st (sd:sql/transient conn get-last-id-query)))
+    (sd:query sd:fetch st)))
 
 (define (%get-ids-custom criterion)
   #f)
 
 (define (%disconnect)
-  (sd:close-database (current-connection)))
+  (let ((conn (current-connection)))
+    (when conn
+      (sd:close-database conn)
+      (current-connection #f))))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -1114,7 +1117,10 @@ SQL
              dbfile
              (normalize-pathname (make-pathname (current-directory) dbfile))))
          (%connect
-           (lambda () (current-connection (sd:open-database (%db-file%)))))
+           (lambda ()
+             (let ((conn (current-connection)))
+               (unless conn
+                 (current-connection (sd:open-database (%db-file%)))))))
          (cpath
            (if (absolute-pathname? content-path)
              content-path
@@ -1158,11 +1164,11 @@ SQL
     (get-article-list %get-article-list)
     (get-articles-by-date %get-articles-by-date)
     (get-meta-list %get-meta-list)
-    (get-ids-custom %get-ids-custom)
     (get-last-id %get-last-id)
+    (get-ids-custom %get-ids-custom)
     (connect %connect)
     (disconnect %disconnect)
-    #t)
+    #t))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
