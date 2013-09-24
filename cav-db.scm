@@ -20,8 +20,6 @@
 
 (define first-id (make-parameter (lambda (_) 0)))
 
-(define db-file (make-parameter #f))
-
 (define content-path (make-parameter #f))
 
 
@@ -118,6 +116,16 @@
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
+
+
+;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+;;; ----  CONNECTING AND DISCONNECTING  ------------------------------------
+
+(define connect (make-parameter #f))
+
+(define disconnect (make-parameter #f))
+
+;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 ) ; END MODULE
 
