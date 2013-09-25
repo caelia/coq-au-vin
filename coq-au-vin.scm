@@ -436,6 +436,20 @@
     '()
     article-data))
 
+(define (make-simple-pager count per-page offset)
+  (and (> count per-page)
+       (cond
+         ((= offset 0) `((newer . #f) (older . ,(number->string per-page))))
+         ((>= (+ offset per-page) count) `((newer . ,(number->string (- offset per-page))) (older . #f)))
+         (else `((newer . ,(number->string (- offset per-page))) (older . ,(number->string (+ offset per-page))))))))
+
+; (define (make-full-pager count per-page offset)
+;   (and (> count per-page)
+;        (let ((npages (inexact->exact (ceiling (/ count per-page))))
+;              (this-page (/ offset per-page)))
+;          (cond
+;            ((< npages 8)
+
 ;;; ========================================================================
 ;;; ------  Hi-level  ------------------------------------------------------
 
@@ -474,7 +488,24 @@
             (else (lambda (_) "")))))
     (let-values (((count list-data)
                   ((db:get-article-list) criterion limit offset mkteaser)))
-      (let* ((list-vars
+      (let* ((self-base-url
+               (string-append
+                 "/"
+                 (if (eqv? criterion 'all)
+                   "articles"
+                   (string-append
+                     (case (car criterion)
+                       ((tag) "tags")
+                       ((series) "series")
+                       ((author) "authors")
+                       ((category) "categories"))
+                     "/"
+                     (cadr criterion)))))
+             (simple-pager
+               (make-simple-pager count limit offset))
+             ;(full-pager
+             ;  (make-full-pager count limit offset))
+             (list-vars
                (map
                  (lambda (datum) (prepare-article-vars datum date-format))
                  list-data))
@@ -482,7 +513,9 @@
                (config-get
                  'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
                  'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
-             (vars `((articles ,@list-vars) ,@page-vars))
+             (vars
+               `((self_base_url . ,self-base-url) (simple_pager ,@simple-pager)
+                 (articles ,@list-vars) ,@page-vars))
              (ctx (cvt:make-context vars: vars)))
         ((db:disconnect))
         (cvt:render "article-list.html" ctx port: out)))))
