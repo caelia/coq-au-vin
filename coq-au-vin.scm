@@ -443,6 +443,35 @@
          ((>= (+ offset per-page) count) `((newer . ,(number->string (- offset per-page))) (older . #f)))
          (else `((newer . ,(number->string (- offset per-page))) (older . ,(number->string (+ offset per-page))))))))
 
+(define (split-list list-string)
+  (map
+    string-trim-both
+    (string-split list-string ",")))
+
+(define (prepare-form-data form-data)
+  (let* ((verify-field
+          (lambda (fname)
+            (let ((val (alist-ref fname form-data)))
+              (and val
+                   (> (string-length (string-trim-both val)) 0)))))
+         (required-present
+           (and (verify-field 'title)
+                (verify-field 'body)
+                (verify-field 'authors))))
+    (and required-present
+         (let ((prepare-value
+                 (lambda (key val)
+                   (case key
+                     ((authors tags series) (split-list val))
+                     (else val)))))
+           (foldl
+             (lambda (pre pair)
+               (let ((k (car pair))
+                     (v (cdr pair)))
+                 (alist-update k (prepare-value k v) pre)))
+             '((subtitle) (series) (tags) (categories) (sticky) (sticky_until) (teaser_len) (alias))
+             form-data)))))
+
 ; (define (make-full-pager count per-page offset)
 ;   (and (> count per-page)
 ;        (let ((npages (inexact->exact (ceiling (/ count per-page))))
@@ -542,9 +571,31 @@
                                (per-page 10) (show 'teaser))
   #f)
 
-; (define (add-article form-data)
-;   ((db:connect))
-;   (let ((nid (get-node-id)))
+(define (get-new-article-form/html #!optional (out (current-output-port)))
+  (let* ((vars
+           (config-get
+             'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
+             'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
+         (ctx (cvt:make-context vars: vars)))
+    (cvt:render "edit.html" ctx port: out)))
+
+(define (get-article-edit-form/html id/alias #!optional (out (current-output-port)))
+  ((db:connect))
+  (let* ((article-data (get-article-data id/alias))
+         ; (html-body (process-body article-data))
+         (vars* (prepare-article-vars article-data date-format))
+         (page-vars
+           (config-get
+             'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
+             'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
+         (vars `((articleID . ,id/alias) ,@page-vars ,@vars*))
+         (ctx (cvt:make-context vars: vars)))
+    ((db:disconnect))
+    (cvt:render "edit.html" ctx port: out)))
+
+(define (add-article form-data #!optional (out (current-output-port)))
+
+(define (update-article id/alias form-data #!optional (out (current-output-port)))
 
 
 (define (app-init #!key (site-path #f) (template-path #f))

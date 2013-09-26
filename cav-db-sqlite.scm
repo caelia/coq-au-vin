@@ -447,10 +447,20 @@ SQL
 
 ;;; ------  SQL Queries  ---------------------------------------------------
 
+(define get-series-id-query
+  "SELECT id FROM series WHERE title = ?;")
+
+(define get-series-last-ptno-query
+  "SELECT series_pt FROM articles WHERE series = ? ORDER BY series_pt DESC LIMIT 1;")
+
+(define create-series-query
+  "INSERT INTO series (title) VALUES (?);")
+
 (define create-article-query
 #<<SQL
-INSERT INTO articles (node_id, title, series, series_pt, subtitle, created_dt, teaser_len, alias)
-  SELECT ?, ?, ?, ?, ?, strftime('%s', 'now', 'localtime'), ?, ?;
+INSERT INTO articles (node_id, title, series, series_pt, subtitle, created_dt,
+                      teaser_len, alias, sticky, sticky_until)
+  SELECT ?, ?, ?, ?, ?, strftime('%s', 'now', 'localtime'), ?, ?, ?, ?;
 SQL
 )
 
@@ -545,16 +555,37 @@ SQL
 ;;; ========================================================================
 ;;; ------  Functions  -----------------------------------------------------
 
+(define (%get-series-info title)
+  (let* ((conn (current-connection))
+         (st-id (sd:sql conn get-series-id-query))
+         (st-pn (sd:sql/transient conn get-series-last-ptno-query))
+         (r-id (sd:query sd:fetch st-id title)))
+    (if (null? r-id)
+      (let* ((st-create (sd:sql/transient conn create-series-query))
+             (r-id (begin (sd:exec st-create title) (sd:query sd:fetch st-id title))))
+        (values (car r-id) 0))
+      (let* ((id (car r-id))
+             (r-ptno (sd:query sd:fetch st-pn id)))
+        (values id (car r-ptno))))))
+
+(define (%store-article-body node-id body)
+  (let ((body-path (make-pathname (%content-path%) (make-pathname node-id "body"))))
+    (with-output-to-file
+      body-path
+      (display body))))
+
 (define (%create-article node-id title author/s
                          #!key (series '()) (series-pt '()) (subtitle '())
-                         (teaser-len '()) (alias '()) (tags '()) (categories '()))
+                         (teaser-len '()) (alias '()) (tags '()) (categories '())
+                         (sticky '()) (sticky-until '()))
   (let* ((authors (if (list? author/s) author/s (list author/s)))
          (conn (current-connection))
+         (series
          (st-art (sd:sql/transient conn create-article-query))
          (st-auth (sd:sql conn add-article-author-query))
          (st-tag (sd:sql conn add-article-tag-query))
          (st-cat (sd:sql conn add-article-category-query)))
-    (sd:exec st-art node-id title series series-pt subtitle teaser-len alias)
+    (sd:exec st-art node-id title series series-pt subtitle teaser-len alias sticky sticky-until)
     (for-each
       (lambda (auth) (sd:exec st-auth node-id auth))
       authors)
@@ -565,13 +596,38 @@ SQL
       (lambda (cat) (sd:exec st-cat node-id cat))
       categories)))
 
-(define (%update-article node-id #!key (title '()) (series '()) (series-pt '()) (subtitle '())
-                        (teaser-len '()) (alias '()) (tags '()) (categories '()))
-  (let* ((conn (current-connection))
+(define (%construct-update-query node-id fields)
+  (let ((tail " WHERE node_id = ?;")
+        (main
+          (foldl
+            (lambda (q fld)
+              (string-append q " " (symbol->string fld) " = ?,"))
+            "UPDATE articles SET"
+            fields)))
+    (string-append (string-drop-right main 1) tail)))
+
+(define (%update-article node-id fields)
+  (let* ((non-null-fields
+           (foldl
+             (lambda (prev fld)
+               (if (null? (cdr fld))
+                 prev
+                 `(,fld ,@prev)))
+             '()
+             fields))
+         (keys+vals
+           (let loop ((in non-null-fields) (out1 '()) (out2 '()))
+             (if (null? in)
+               (list (reverse out1) (reverse out2))
+               (loop (cdr in) (cons (caar in) out1) (cons (cdar in) out2)))))
+         (keys (car keys+vals))
+         (vals (cadr keys+vals))
+         (update-article-query (%construct-update-query node-id keys))
+         (conn (current-connection))
          (st-art (sd:sql/transient conn update-article-query))
          (st-tag (sd:sql conn add-article-tag-query))
          (st-cat (sd:sql conn add-article-category-query)))
-    (sd:exec st-art title series series-pt subtitle teaser-len alias node-id)
+    (apply sd:exec `(,st-art ,@vals ,node-id))
     (for-each
       (lambda (tag) (sd:exec st-tag node-id tag))
       tags)
