@@ -4,9 +4,6 @@
 ;;;   This program is open-source software, released under the
 ;;;   BSD license. See the accompanying LICENSE file for details.
 
-;(load "./cav-db.so")
-;(require-library cav-db)
-
 (module coq-au-vin
         *
         (import scheme chicken)
@@ -448,29 +445,35 @@
     string-trim-both
     (string-split list-string ",")))
 
-(define (prepare-form-data form-data)
+(define (prepare-form-data form-data #!optional (update #f))
   (let* ((verify-field
           (lambda (fname)
             (let ((val (alist-ref fname form-data)))
               (and val
                    (> (string-length (string-trim-both val)) 0)))))
          (required-present
-           (and (verify-field 'title)
-                (verify-field 'body)
-                (verify-field 'authors))))
+           (or update
+               (and (verify-field 'title)
+                    (verify-field 'body)
+                    (verify-field 'authors)))))
     (and required-present
          (let ((prepare-value
                  (lambda (key val)
                    (case key
                      ((authors tags series) (split-list val))
                      (else val)))))
-           (foldl
-             (lambda (pre pair)
-               (let ((k (car pair))
-                     (v (cdr pair)))
-                 (alist-update k (prepare-value k v) pre)))
-             '((subtitle) (series) (tags) (categories) (sticky) (sticky_until) (teaser_len) (alias))
-             form-data)))))
+           (let loop ((keys '(title series subtitle alias sticky authors categories tags body))
+                      (output '()))
+             (if (null? keys)
+               (reverse output)
+               (let* ((key (car keys))
+                      (val* (alist-ref key form-data))
+                      (val
+                        (cond
+                          ((null? val*) '())
+                          (val* (prepare-value key val*))
+                          (else '()))))
+                 (loop (cdr keys) `((,key . ,val) . ,output)))))))))
 
 ; (define (make-full-pager count per-page offset)
 ;   (and (> count per-page)
@@ -583,7 +586,7 @@
   ((db:connect))
   (let* ((article-data (get-article-data id/alias))
          ; (html-body (process-body article-data))
-         (vars* (prepare-article-vars article-data date-format))
+         (vars* (prepare-article-vars article-data "%Y-%m-%d"))
          (page-vars
            (config-get
              'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
@@ -594,9 +597,24 @@
     (cvt:render "edit.html" ctx port: out)))
 
 (define (add-article form-data #!optional (out (current-output-port)))
+  ((db:connect))
+  (let* ((data (prepare-form-data form-data))
+         (node-id (get-node-id))
+         (data+ (cons node-id (map cdr data))))
+    (apply (db:create-article) data+)
+    ((db:disconnect))
+    (let ((ctx (cvt:make-context vars: '((message . "Article successfully posted.") (msg_class . "info")))))
+      (cvt:render "message.html" ctx port: out))))
 
 (define (update-article id/alias form-data #!optional (out (current-output-port)))
-
+  ((db:connect))
+  (let* ((node-id (if (node-id? id/alias) id/alias ((db:alias->node-id) id/alias)))
+         (data (prepare-form-data form-data #t))
+         (data+ (cons node-id (map cdr data))))
+    (apply (db:update-article) data+)
+    ((db:disconnect))
+    (let ((ctx (cvt:make-context vars: '((message . "Article successfully updated.") (msg_class . "info")))))
+      (cvt:render "message.html" ctx port: out))))
 
 (define (app-init #!key (site-path #f) (template-path #f))
   (when site-path

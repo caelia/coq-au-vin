@@ -459,17 +459,17 @@ SQL
 (define create-article-query
 #<<SQL
 INSERT INTO articles (node_id, title, series, series_pt, subtitle, created_dt,
-                      teaser_len, alias, sticky, sticky_until)
-  SELECT ?, ?, ?, ?, ?, strftime('%s', 'now', 'localtime'), ?, ?, ?, ?;
+                      alias, sticky)
+  SELECT ?, ?, ?, ?, ?, strftime('%s', 'now', 'localtime'), ?, ?;
 SQL
 )
 
 (define add-article-author-query
 #<<SQL
 INSERT INTO articles_x_authors (article, author)
-  SELECT articles.id, authors.id
-  FROM articles, authors
-  WHERE articles(node_id) = ? AND users(uname) = ?;
+  SELECT articles.id, users.id
+  FROM articles, users
+  WHERE articles.node_id = ? AND users.uname = ?;
 SQL
 )
 
@@ -478,7 +478,7 @@ SQL
 INSERT INTO articles_x_tags (article, tag)
   SELECT articles.id, tags.id
   FROM articles, tags
-  WHERE articles(node_id) = ? AND tags(tag) = ?;
+  WHERE articles.node_id = ? AND tags.tag = ?;
 SQL
 )
 
@@ -487,14 +487,15 @@ SQL
 INSERT INTO articles_x_categories (article, category)
   SELECT articles.id, categories.id
   FROM articles, categories
-  WHERE articles(node_id) = ? AND categories(category) = ?;
+  WHERE articles.node_id = ? AND categories.category = ?;
 SQL
 )
 
 (define update-article-query
 #<<SQL
 UPDATE articles
-SET title = ?, series = ?, series_pt = ?, subtitle = ?, teaser_len = ?, alias = ?
+SET title = ?, series = ?, series_pt = ?, subtitle = ?,
+    modified_dt = strftime('%s', 'now', 'localtime'), alias = ?, sticky = ?
 WHERE node_id = ?;
 SQL
 )
@@ -508,21 +509,21 @@ SQL
 (define delete-article-author-query
 #<<SQL
 DELETE FROM articles_x_authors
-WHERE article = articles(id) AND articles(id) = ?;
+WHERE article = articles.id AND articles.node_id = ?;
 SQL
 )
 
 (define delete-article-tag-query
 #<<SQL
 DELETE FROM articles_x_tag
-WHERE article = articles(id) AND articles(id) = ?;
+WHERE article = articles.id AND articles.node_id = ?;
 SQL
 )
 
 (define delete-article-category-query
 #<<SQL
 DELETE FROM articles_x_categories
-WHERE article = articles(id) AND articles(id) = ?;
+WHERE article = articles.id AND articles.node_id = ?;
 SQL
 )
 
@@ -563,29 +564,33 @@ SQL
     (if (null? r-id)
       (let* ((st-create (sd:sql/transient conn create-series-query))
              (r-id (begin (sd:exec st-create title) (sd:query sd:fetch st-id title))))
-        (values (car r-id) 0))
+        `(,(car r-id) 0))
       (let* ((id (car r-id))
              (r-ptno (sd:query sd:fetch st-pn id)))
-        (values id (car r-ptno))))))
+        `(,id ,(car r-ptno))))))
 
-(define (%store-article-body node-id body)
-  (let ((body-path (make-pathname (%content-path%) (make-pathname node-id "body"))))
+(define (%store-article-body node-id body #!optional (new #t))
+  (let* ((content-path (make-pathname (%content-path%) node-id))
+         (body-path (make-pathname content-path "body")))
+    (cond
+      ((and new (file-exists? content-path)) (error "Content directory already exists!"))
+      (new (create-directory content-path #t))
+      ((not (file-exists? content-path)) (error "Content directory does not exist!"))
+      (else #t))
     (with-output-to-file
       body-path
-      (display body))))
+      (lambda () (display body)))))
 
-(define (%create-article node-id title author/s
-                         #!key (series '()) (series-pt '()) (subtitle '())
-                         (teaser-len '()) (alias '()) (tags '()) (categories '())
-                         (sticky '()) (sticky-until '()))
-  (let* ((authors (if (list? author/s) author/s (list author/s)))
+(define (%create-article node-id title series subtitle alias sticky authors categories tags body)
+  (let* ((id+pn (and (not (string-null? series)) (%get-series-info series)))
+         (series-id (or (and id+pn (car id+pn)) '()))
+         (series-pt (or (and id+pn (cadr id+pn)) '()))
          (conn (current-connection))
-         (series
          (st-art (sd:sql/transient conn create-article-query))
          (st-auth (sd:sql conn add-article-author-query))
          (st-tag (sd:sql conn add-article-tag-query))
          (st-cat (sd:sql conn add-article-category-query)))
-    (sd:exec st-art node-id title series series-pt subtitle teaser-len alias sticky sticky-until)
+    (sd:exec st-art node-id title series-id series-pt subtitle alias sticky)
     (for-each
       (lambda (auth) (sd:exec st-auth node-id auth))
       authors)
@@ -594,7 +599,8 @@ SQL
       tags)
     (for-each
       (lambda (cat) (sd:exec st-cat node-id cat))
-      categories)))
+      categories)
+    (%store-article-body node-id body)))
 
 (define (%construct-update-query node-id fields)
   (let ((tail " WHERE node_id = ?;")
@@ -606,7 +612,8 @@ SQL
             fields)))
     (string-append (string-drop-right main 1) tail)))
 
-(define (%update-article node-id fields)
+;; FIXME: There are probably several things wrong w/ this function
+(define (%update-article-partial node-id fields)
   (let* ((non-null-fields
            (foldl
              (lambda (prev fld)
@@ -628,12 +635,35 @@ SQL
          (st-tag (sd:sql conn add-article-tag-query))
          (st-cat (sd:sql conn add-article-category-query)))
     (apply sd:exec `(,st-art ,@vals ,node-id))
+    ; Should be a bit more here ... e.g. authors, tags, categories, body ...
+    #f))
+
+(define (%update-article node-id title series subtitle alias sticky authors categories tags body)
+  (let* ((id+pn (and (not (string-null? series)) (%get-series-info series)))
+         (series-id (or (and id+pn (car id+pn)) '()))
+         (series-pt (or (and id+pn (cadr id+pn)) '()))
+         (conn (current-connection))
+         (st-art (sd:sql/transient conn create-article-query))
+         (st-delauth (sd:sql/transient conn delete-article-author-query))
+         (st-auth (sd:sql conn add-article-author-query))
+         (st-deltag (sd:sql/transient conn delete-article-tag-query))
+         (st-tag (sd:sql conn add-article-tag-query))
+         (st-delcat (sd:sql/transient conn delete-article-category-query))
+         (st-cat (sd:sql conn add-article-category-query)))
+    (sd:exec st-art title series-id series-pt subtitle alias sticky node-id)
+    (sd:exec st-delauth node-id)
+    (for-each
+      (lambda (auth) (sd:exec st-auth node-id auth))
+      authors)
+    (sd:exec st-deltag node-id)
     (for-each
       (lambda (tag) (sd:exec st-tag node-id tag))
       tags)
+    (sd:exec st-delcat node-id)
     (for-each
       (lambda (cat) (sd:exec st-cat node-id cat))
-      categories)))
+      categories)
+    (%store-article-body node-id body #f)))
 
 (define (%delete-article node-id)
   (let* ((conn (current-connection))
@@ -795,6 +825,9 @@ SELECT count(*) FROM articles
 WHERE created_dt >= ? AND created_dt < ?;
 SQL
 )
+
+(define get-id-for-alias-query
+  "SELECT node_id FROM articles WHERE alias = ?;")
 
 (define get-last-id-query
 #<<SQL
@@ -1150,6 +1183,11 @@ SQL
          (raw-data (sd:query sd:fetch-alists st)))
     (map post-proc raw-data)))
 
+(define (%alias->node-id alias)
+  (let* ((conn (current-connection))
+         (st (sd:sql/transient conn get-id-for-alias-query)))
+    (sd:query sd:fetch st)))
+
 (define (%get-last-id)
   (let* ((conn (current-connection))
          (st (sd:sql/transient conn get-last-id-query)))
@@ -1220,6 +1258,7 @@ SQL
     (get-article-list %get-article-list)
     (get-articles-by-date %get-articles-by-date)
     (get-meta-list %get-meta-list)
+    (alias->node-id %alias->node-id)
     (get-last-id %get-last-id)
     (get-ids-custom %get-ids-custom)
     (connect %connect)
