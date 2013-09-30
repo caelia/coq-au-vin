@@ -53,6 +53,8 @@
 
 (define %first-node-id% (make-parameter "10000001"))
 
+(define %default-roles% (make-parameter '("admin" "editor" "author" "member" "guest")))
+
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 
@@ -311,15 +313,25 @@
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  USERS, SESSIONS, AUTHENTICATION  ---------------------------------
 
-; (define (register-user uname password email role #!optional (disp-name '()))
-;   (let ((phash (string->sha1sum password)))
-;     (unless (member role '("editor" "author" "member"))
-;       (error (string-append "'" role "' is not a recognized role.")))
-;     (call-with-database
-;       (make-pathname (make-pathname (%blog-root%) "data") "example.db")
-;       (lambda (conn)
-;         ((db:current-connection) conn)
-;         ((db:add-user) uname phash email role disp-name))))) 
+(define (register-roles #!optional (roles (%default-roles%)))
+  ;((db:connect))
+  (for-each (db:add-role) roles)
+  ;((db:disconnect)))
+  )
+
+(define (register-user uname password email role #!optional (disp-name '()))
+  (let ((blank? (lambda (s) (string=? (string-trim-both s) ""))))
+    (when (or (blank? uname) (blank? password)
+              (blank? email) (blank? role))
+      (error "One or more required fields is blank.")))
+  ((db:connect))
+  (let ((roles (flatten ((db:get-roles)))))
+    (unless (member role roles)
+      ((db:disconnect))
+      (eprintf "'~A' is not a recognized role.\n" role)))
+  (let ((phash (string->sha1sum password)))
+    ((db:add-user) uname phash email role disp-name))
+  ((db:disconnect)))
 
 ; (define (login uname password)
 ;   (call-with-database
