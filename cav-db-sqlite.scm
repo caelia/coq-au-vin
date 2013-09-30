@@ -269,6 +269,9 @@ SQL
 (define delete-role-query
   "DELETE FROM roles WHERE name = ?;")
 
+(define get-roles-query
+  "SELECT name FROM roles;")
+
 (define add-user-query
   "INSERT INTO users (uname, passhash, email, role, display_name) 
       SELECT ?, ?, ?, id, ?
@@ -348,6 +351,11 @@ SQL
   (let* ((conn (current-connection))
          (st (sd:sql/transient conn delete-role-query)))
     (sd:exec st role-name)))
+
+(define (%get-roles)
+  (let* ((conn (current-connection))
+         (st (sd:sql/transient conn get-roles-query)))
+    (sd:query sd:fetch-all st)))
 
 (define (%add-user uname phash email role #!optional (disp-name '()))
   (let* ((conn (current-connection))
@@ -1225,6 +1233,7 @@ SQL
     ;; Generic DB parameters
     (add-role %add-role)
     (delete-role %delete-role)
+    (get-roles %get-roles)
     (add-user %add-user)
     (user-exists? %user-exists?)
     (get-user-info %get-user-info)

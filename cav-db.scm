@@ -28,6 +28,8 @@
 
 (define delete-role (make-parameter #f))
 
+(define get-roles (make-parameter #f))
+
 (define add-user (make-parameter #f))
 
 (define user-exists? (make-parameter #f))
