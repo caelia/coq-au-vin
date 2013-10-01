@@ -441,6 +441,8 @@
            (cons (cons 'article_title val) prev))
           ((content)
            (cons (cons 'text (process-body article-data)) prev))
+          ((categories tags)
+           (cons pair prev))
           (else
             (let ((res (if (null? val) (cons key "") pair)))
               (cons res prev))))))
