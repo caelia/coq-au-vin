@@ -1025,14 +1025,12 @@ SQL
          (categories (sd:query sd:fetch-all st-categories node-id))
          (authors (sd:query sd:fetch-alists st-auth node-id))
          (tags (sd:query sd:fetch-all st-tags node-id))
-         (content (%get-article-content node-id))
-         (flatten*
-           (lambda (lst) (if (null? lst) #f (flatten lst)))))
+         (content (%get-article-content node-id)))
     (append
       `((content . ,content)
         (authors . ,(falsify authors))
-        (tags . ,(flatten* tags))
-        (categories . ,(flatten* categories)))
+        (tags . ,(flatten tags))
+        (categories . ,(flatten categories)))
       series)))
 
 (define (%get-article-by-nodeid node-id)
