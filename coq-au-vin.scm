@@ -235,6 +235,10 @@
 (define (config*)
   (hash-table->alist (%config%)))
 
+(define (get-session-key uname)
+  (string->sha1sum
+    (sprintf "~A:~A:~A" uname (current-seconds) (random 4096))))
+
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 
@@ -335,17 +339,31 @@
         ((db:add-user) uname phash email role disp-name))
     ((db:disconnect))))
 
-; (define (login uname password)
-;   (call-with-database
-;     (make-pathname (make-pathname (%blog-root%) "data") "example.db")
-;     (lambda (conn)
-;       ((db:current-connection) conn)
-;       (if ((db:can-login?) uname)
-;         (let ((phash (string->sha1sum password)))
-;           (if (string=? phash ((db:get-passhash) uname))
-;             ;;; FIXME: obviously bogus code here!
-;             #t
-;             #f))))))
+(define (login uname password #!optional (keygen get-session-key))
+  ((db:connect))
+  (if ((db:can-login?) uname)
+    (let* ((phash (string->sha1sum password))
+           (result
+             (if (string=? phash ((db:get-passhash) uname))
+               (let* ((logged-in ((db:is-logged-in?) uname))
+                      (session-key (or logged-in (keygen uname))))
+                 (if logged-in
+                   ((db:refresh-session) session-key (+ (current-seconds) (%session-timeout%)))
+                   ((db:add-session) session-key uname (+ (current-seconds) (%session-timeout%))))
+                 session-key)
+               (begin
+                 ((db:bad-login) uname)
+                 #f))))
+      ((db:disconnect))
+      result)))
+
+(define (logout #!key (uname #f) (session #f))
+  (when (or uname session)
+    ((db:connect))
+    (let ((session-key (or session ((db:is-logged-in?) uname))))
+      (when session-key
+        ((db:delete-session) session-key))
+      ((db:disconnect)))))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 

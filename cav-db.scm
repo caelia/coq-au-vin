@@ -46,6 +46,8 @@
 
 (define can-login? (make-parameter #f))
 
+(define is-logged-in? (make-parameter #f))
+
 (define get-passhash (make-parameter #f))
 
 (define bad-login (make-parameter #f))

@@ -41,6 +41,17 @@
 
 (define %content-path% (make-parameter #f))
 
+(define %connection-count% (make-parameter 0))
+
+(define (conn-count++)
+  (%connection-count% (+ (%connection-count%) 1)))
+
+(define (conn-count--)
+  (let ((count (%connection-count%)))
+    (if (<= count 0)
+      (error "Attempting to decrement connection count when it is already 0!")
+      (%connection-count% (- count 1)))))
+
 (define (falsify alist)
   (map
     (lambda (pair)
@@ -324,8 +335,12 @@ SQL
 
 (define add-session-query
   "INSERT INTO sessions (key, user, expires)
-      SELECT ?, users(id), ?
-      WHERE users(uname) = ?;")
+      SELECT ?, id, ? FROM users
+      WHERE uname = ?;")
+
+(define user-logged-in-query
+  "SELECT key FROM sessions, users
+   WHERE user = users.id AND uname = ? AND expires >= ?;") 
 
 (define refresh-session-query
   "UPDATE sessions SET expires = ? WHERE key = ?;")
@@ -397,23 +412,28 @@ SQL
          (st (sd:sql/transient conn user-blocked-query)))
     (not (sd:query sd:fetch-value st uname (current-seconds)))))
 
+(define (%is-logged-in? uname)
+  (let* ((conn (current-connection))
+         (st (sd:sql/transient conn user-logged-in-query)))
+    (sd:query sd:fetch-value st uname (current-seconds))))
+
 (define (%get-passhash uname)
   (let* ((conn (current-connection))
-         (st (sd:sql/transient conn user-blocked-query)))
-    (sd:query sd:fetch-value st)))
+         (st (sd:sql/transient conn get-passhash-query)))
+    (sd:query sd:fetch-value st uname)))
 
-(define (%bad-login uname)
+(define (%bad-login uname #!key (block-for 120) (tries 3))
   (let* ((conn (current-connection))
          (s-count (sd:sql/transient conn bad-login-count-query))
          (s-add (sd:sql/transient conn add-bad-login-query))
          (s-clear (sd:sql/transient conn clear-bad-logins-query))
          (s-block (sd:sql/transient conn block-user-query)))
     (let ((count (sd:query sd:fetch-value s-count)))
-      (printf "bad login count: ~A\n" count)
-      (if (and count (> count 1))
+      ; (printf "bad login count: ~A\n" count)
+      (if (and count (>= count tries))
         (begin
           (sd:exec s-clear uname)
-          (sd:exec s-block (+ current-seconds 120) uname))
+          (sd:exec s-block (+ (current-seconds) block-for) uname))
         (sd:exec s-add (current-seconds) uname)))))
 
 (define (%clear-bad-logins uname)
@@ -1205,10 +1225,11 @@ SQL
   #f)
 
 (define (%disconnect)
-  (let ((conn (current-connection)))
-    (when conn
-      (sd:close-database conn)
-      (current-connection #f))))
+  (let ((count (conn-count--)))
+    (when (= count 0)
+      (let ((conn (current-connection)))
+        (sd:close-database conn)
+        (current-connection #f)))))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -1222,7 +1243,8 @@ SQL
            (lambda ()
              (let ((conn (current-connection)))
                (unless conn
-                 (current-connection (sd:open-database (%db-file%)))))))
+                 (current-connection (sd:open-database (%db-file%))))
+               (conn-count++))))
          (cpath
            (if (absolute-pathname? content-path)
              content-path
@@ -1242,6 +1264,7 @@ SQL
     (update-user-info %update-user-info)
     (delete-user %delete-user)
     (can-login? %can-login?)
+    (is-logged-in? %is-logged-in?)
     (get-passhash %get-passhash)
     (bad-login %bad-login)
     (clear-bad-logins %clear-bad-logins)
