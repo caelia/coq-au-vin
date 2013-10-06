@@ -494,8 +494,8 @@
          (let ((prepare-value
                  (lambda (key val)
                    (case key
-                     ((authors tags series) (split-list val))
-                     (else val)))))
+                     ((authors tags categories) (split-list val))
+                     (else (string-trim-both val))))))
            (let loop ((keys '(title series subtitle alias sticky authors categories tags body))
                       (output '()))
              (if (null? keys)
@@ -638,7 +638,7 @@
     (apply (db:create-article) data+)
     ((db:disconnect))
     (let ((ctx (cvt:make-context vars: '((message . "Article successfully posted.") (msg_class . "info")))))
-      (cvt:render "message.html" ctx port: out))))
+      (cvt:render "msg.html" ctx port: out))))
 
 (define (update-article id/alias form-data #!optional (out (current-output-port)))
   ((db:connect))
@@ -648,7 +648,7 @@
     (apply (db:update-article) data+)
     ((db:disconnect))
     (let ((ctx (cvt:make-context vars: '((message . "Article successfully updated.") (msg_class . "info")))))
-      (cvt:render "message.html" ctx port: out))))
+      (cvt:render "msg.html" ctx port: out))))
 
 (define (app-init #!key (site-path #f) (template-path #f))
   (when site-path
