@@ -637,7 +637,12 @@
          (data+ (cons node-id (map cdr data))))
     (apply (db:create-article) data+)
     ((db:disconnect))
-    (let ((ctx (cvt:make-context vars: '((message . "Article successfully posted.") (msg_class . "info")))))
+    (let* ((page-vars
+             (config-get
+               'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
+               'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
+           (vars `((message . "Article successfully posted.") (msg_class . "info") ,@page-vars))
+           (ctx (cvt:make-context vars: vars)))
       (cvt:render "msg.html" ctx port: out))))
 
 (define (update-article id/alias form-data #!optional (out (current-output-port)))
