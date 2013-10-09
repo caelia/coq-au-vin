@@ -340,20 +340,20 @@
     ((db:disconnect))))
 
 (define (login uname password #!optional (keygen get-session-key))
-  ((db:connect))
-  (if ((db:can-login?) uname)
-    (let* ((phash (string->sha1sum password))
-           (result
-             (if (string=? phash ((db:get-passhash) uname))
-               (let* ((logged-in ((db:is-logged-in?) uname))
-                      (session-key (or logged-in (keygen uname))))
-                 (if logged-in
-                   ((db:refresh-session) session-key (+ (current-seconds) (%session-timeout%)))
-                   ((db:add-session) session-key uname (+ (current-seconds) (%session-timeout%))))
-                 session-key)
-               (begin
-                 ((db:bad-login) uname)
-                 #f))))
+  (let ((phash (string->sha1sum password)))
+    ((db:connect))
+    (let ((result
+            (and ((db:can-login?) uname)
+                 (if (string=? phash ((db:get-passhash) uname))
+                   (let* ((logged-in ((db:is-logged-in?) uname))
+                          (session-key (or logged-in (keygen uname))))
+                     (if logged-in
+                       ((db:refresh-session) session-key (+ (current-seconds) (%session-timeout%)))
+                       ((db:add-session) session-key uname (+ (current-seconds) (%session-timeout%))))
+                     session-key)
+                   (begin
+                     ((db:bad-login) uname)
+                     #f)))))
       ((db:disconnect))
       result)))
 
@@ -489,7 +489,9 @@
            (or update
                (and (verify-field 'title)
                     (verify-field 'body)
-                    (verify-field 'authors)))))
+                    (verify-field 'authors)
+                    (verify-field 'uname)
+                    (verify-field 'password)))))
     (and required-present
          (let ((prepare-value
                  (lambda (key val)
@@ -630,30 +632,57 @@
     ((db:disconnect))
     (cvt:render "edit.html" ctx port: out)))
 
+;;; TEMPORARY! Just until we have sessions working!
+(define (check-pass uname password)
+  (let ((phash (string->sha1sum password)))
+    ((db:connect))
+    (let ((result (string=? phash ((db:get-passhash) uname))))
+      ((db:disconnect))
+      result)))
+
 (define (add-article form-data #!optional (out (current-output-port)))
-  ((db:connect))
-  (let* ((data (prepare-form-data form-data))
+  (let* ((page-vars
+           (config-get
+             'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
+             'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
+         (data (prepare-form-data form-data))
          (node-id (get-node-id))
-         (data+ (cons node-id (map cdr data))))
-    (apply (db:create-article) data+)
-    ((db:disconnect))
-    (let* ((page-vars
-             (config-get
-               'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
-               'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
-           (vars `((message . "Article successfully posted.") (msg_class . "info") ,@page-vars))
-           (ctx (cvt:make-context vars: vars)))
-      (cvt:render "msg.html" ctx port: out))))
+         (data+ (cons node-id (map cdr data)))
+         (uname (alist-ref 'uname data))
+         (password (alist-ref 'password data)))
+    ((db:connect))
+    (let ((vars
+            (if (check-pass uname password)
+              (begin
+                (apply (db:create-article) data+)
+                `((message . "Article successfully posted.") (msg_class . "info")
+                  (proceed_to . "/articles") ,@page-vars))
+              `((message . "User name and/or password is incorrect.") (msg_class . "error")
+                (proceed_to . "/articles/new") ,@page-vars))))
+      ((db:disconnect))
+      (cvt:render "msg.html" (make-context vars: vars) port: out))))
 
 (define (update-article id/alias form-data #!optional (out (current-output-port)))
   ((db:connect))
-  (let* ((node-id (if (node-id? id/alias) id/alias ((db:alias->node-id) id/alias)))
+  (let* ((page-vars
+           (config-get
+             'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
+             'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
+         (uname (alist-ref 'uname data))
+         (password (alist-ref 'password data))
+         (node-id (if (node-id? id/alias) id/alias ((db:alias->node-id) id/alias)))
          (data (prepare-form-data form-data #t))
-         (data+ (cons node-id (map cdr data))))
-    (apply (db:update-article) data+)
+         (data+ (cons node-id (map cdr data)))
+         (vars
+           (if (and uname password (check-pass uname password))
+             (begin
+               (apply (db:update-article) data+)
+               `((message . "Article successfully updated.") (msg_class . "info")
+                 (proceed_to . ,(string-append "/articles/" id/alias)) ,@page-vars))
+             `((message . "User name and/or password is incorrect.") (msg_class . "error")
+                 (proceed_to . ,(string-append "/articles/" id/alias "/edit")) ,@page-vars))))
     ((db:disconnect))
-    (let ((ctx (cvt:make-context vars: '((message . "Article successfully updated.") (msg_class . "info")))))
-      (cvt:render "msg.html" ctx port: out))))
+    (cvt:render "msg.html" (make-context vars: vars) port: out)))
 
 (define (app-init #!key (site-path #f) (template-path #f))
   (when site-path
