@@ -129,6 +129,16 @@
          (ends (local-time->seconds tend)))
     (values starts ends)))
 
+(define %object-log-file% (make-parameter "obj.log"))
+
+(define (log-obj msg obj #!optional (logfile (%object-log-file%)))
+  (with-output-to-file
+    logfile
+    (lambda ()
+      (print msg)
+      (pp obj))
+    #:append))
+
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  INITIAL SETUP  ---------------------------------------------------
 
@@ -316,18 +326,18 @@ SQL
 (define bad-login-count-query
   "SELECT count(id)
       FROM bad_logins
-      WHERE user = users(id)
-      AND users(uname) = ?;")
+      WHERE user = users.id
+      AND users.uname = ?;")
 
 (define add-bad-login-query
   "INSERT INTO bad_logins (user, time)
       SELECT id, ?
       FROM users
-      WHERE users(uname) = '?';")
+      WHERE users.uname = '?';")
 
 (define clear-bad-logins-query
   "DELETE FROM bad_logins
-      WHERE user = users(id) AND users(uname) = ?;")
+      WHERE user = users.id AND users.uname = ?;")
 
 (define block-user-query
   "UPDATE users SET blocked_until = ?
@@ -408,9 +418,10 @@ SQL
     (sd:exec st uname)))
 
 (define (%can-login? uname)
-  (let* ((conn (current-connection))
-         (st (sd:sql/transient conn user-blocked-query)))
-    (not (sd:query sd:fetch-value st uname (current-seconds)))))
+  (and (%user-exists? uname)
+       (let* ((conn (current-connection))
+              (st (sd:sql/transient conn user-blocked-query)))
+         (not (sd:query sd:fetch-value st uname (current-seconds))))))
 
 (define (%is-logged-in? uname)
   (let* ((conn (current-connection))
@@ -537,29 +548,29 @@ SQL
 (define delete-article-author-query
 #<<SQL
 DELETE FROM articles_x_authors
-WHERE article = articles.id AND articles.node_id = ?;
+WHERE article = (SELECT id FROM articles) AND (SELECT node_id FROM articles) = ?;
 SQL
 )
 
 (define delete-article-tag-query
 #<<SQL
-DELETE FROM articles_x_tag
-WHERE article = articles.id AND articles.node_id = ?;
+DELETE FROM articles_x_tags
+WHERE article = (SELECT id FROM articles) AND (SELECT node_id FROM articles) = ?;
 SQL
 )
 
 (define delete-article-category-query
 #<<SQL
 DELETE FROM articles_x_categories
-WHERE article = articles.id AND articles.node_id = ?;
+WHERE article = (SELECT id FROM articles) AND (SELECT node_id FROM articles) = ?;
 SQL
 )
 
 (define add-comment-query
 #<<SQL
 INSERT INTO comments (node-id, article, author, created_dt, text, parent)
-SELECT ?, articles(id), authors(id), strftime('%s', 'now', 'localtime'), ?, ?
-WHERE articles(node_id) = ? AND users(uname) = ?;
+SELECT ?, articles.id, authors.id, strftime('%s', 'now', 'localtime'), ?, ?
+WHERE articles.node_id = ? AND users.uname = ?;
 SQL
 )
 
@@ -618,6 +629,18 @@ SQL
          (st-auth (sd:sql conn add-article-author-query))
          (st-tag (sd:sql conn add-article-tag-query))
          (st-cat (sd:sql conn add-article-category-query)))
+    (log-obj "%create-article:node-id" node-id "/tmp/obj.log")
+    (log-obj "title" title "/tmp/obj.log")
+    (log-obj "series" series "/tmp/obj.log")
+    (log-obj "series-id" series-id "/tmp/obj.log")
+    (log-obj "series-pt" series-pt "/tmp/obj.log")
+    (log-obj "subtitle" subtitle "/tmp/obj.log")
+    (log-obj "alias" alias "/tmp/obj.log")
+    (log-obj "sticky" sticky "/tmp/obj.log")
+    (log-obj "authors" authors "/tmp/obj.log")
+    (log-obj "categories" categories "/tmp/obj.log")
+    (log-obj "tags" tags "/tmp/obj.log")
+    (log-obj "body" body "/tmp/obj.log")
     (sd:exec st-art node-id title series-id series-pt subtitle alias sticky)
     (for-each
       (lambda (auth) (sd:exec st-auth node-id auth))
@@ -671,13 +694,25 @@ SQL
          (series-id (or (and id+pn (car id+pn)) '()))
          (series-pt (or (and id+pn (cadr id+pn)) '()))
          (conn (current-connection))
-         (st-art (sd:sql/transient conn create-article-query))
+         (st-art (sd:sql/transient conn update-article-query))
          (st-delauth (sd:sql/transient conn delete-article-author-query))
          (st-auth (sd:sql conn add-article-author-query))
          (st-deltag (sd:sql/transient conn delete-article-tag-query))
          (st-tag (sd:sql conn add-article-tag-query))
          (st-delcat (sd:sql/transient conn delete-article-category-query))
          (st-cat (sd:sql conn add-article-category-query)))
+    (log-obj "%update-article:node-id" node-id "/tmp/obj.log")
+    (log-obj "title" title "/tmp/obj.log")
+    (log-obj "series" series "/tmp/obj.log")
+    (log-obj "series-id" series-id "/tmp/obj.log")
+    (log-obj "series-pt" series-pt "/tmp/obj.log")
+    (log-obj "subtitle" subtitle "/tmp/obj.log")
+    (log-obj "alias" alias "/tmp/obj.log")
+    (log-obj "sticky" sticky "/tmp/obj.log")
+    (log-obj "authors" authors "/tmp/obj.log")
+    (log-obj "categories" categories "/tmp/obj.log")
+    (log-obj "tags" tags "/tmp/obj.log")
+    (log-obj "body" body "/tmp/obj.log")
     (sd:exec st-art title series-id series-pt subtitle alias sticky node-id)
     (sd:exec st-delauth node-id)
     (for-each
