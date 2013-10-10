@@ -432,15 +432,15 @@
                                (limit 10) (offset 0) (teaser-len #f))
   #f)
   
-(define (process-body article-data)
+(define (process-body article-data #!optional (raw #f))
   (let* ((content (alist-ref 'content article-data))
-         (raw-body (or (alist-ref 'body content) (alist-ref 'teaser content)))
-         (sanitized-body (escape-html raw-body)))
-;     (with-output-to-string
-;       (lambda () (markdown->html sanitized-body)))))
-    (markdown->sxml sanitized-body)))
+         (raw-body (or (alist-ref 'body content) (alist-ref 'teaser content))))
+    (if raw
+      raw-body
+      (let ((sanitized-body (escape-html raw-body)))
+        (markdown->sxml sanitized-body)))))
 
-(define (prepare-article-vars article-data date-format)
+(define (prepare-article-vars article-data date-format #!optional (raw #f))
   (foldl
     (lambda (prev pair)
       (let ((key (car pair))
@@ -459,7 +459,7 @@
           ((title)
            (cons (cons 'article_title val) prev))
           ((content)
-           (cons (cons 'text (process-body article-data)) prev))
+           (cons (cons 'text (process-body article-data raw)) prev))
           ((categories tags)
            (cons pair prev))
           (else
@@ -621,7 +621,7 @@
   ((db:connect))
   (let* ((article-data (get-article-data id/alias))
          ; (html-body (process-body article-data))
-         (vars* (prepare-article-vars article-data "%Y-%m-%d"))
+         (vars* (prepare-article-vars article-data "%Y-%m-%d" #t))
          (page-vars
            (config-get
              'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
