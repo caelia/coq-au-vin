@@ -13,7 +13,6 @@
         (import extras)
         (import posix)
         (import srfi-1)
-        ; (import srfi-13)
 
         (use (prefix cav-db db:))
         (use (prefix civet cvt:))
@@ -23,10 +22,6 @@
         ; (use crypt)
         ; ;; FIXME: Need a better password hash! 
         (use simple-sha1)
-
-        ; (use spiffy)
-        ; (use intarweb)
-        ; (use uri-match)
 
         (use utf8)
         (use utf8-srfi-13)
