@@ -204,6 +204,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 === Version History
 
+;0.1.2:     Fixed formatting bug in article teasers.
+
 ;0.1.1:     Added normalize-sxml procedure to work around bad href attributes in body text.
 
 ;0.1:       Initial release.
