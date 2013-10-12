@@ -149,45 +149,29 @@
   (and (= (string-length s) 8)
        (string->number (string-append "#x" s))))
 
-(define (words str n)
+(define (text->teaser str #!optional (n (%default-teaser-length%)))
   (if (< n 1)
-    '()
-    (with-input-from-string str
-      (lambda ()
-        (let ((return-result
-                (lambda (current-word words-out)
-                  (reverse
-                    (if (null? current-word)
-                      words-out
-                      (cons
-                        (list->string (reverse current-word))
-                        words-out))))))
-          (let loop ((state 'init) (count 1) (chr (read-char)) (current-word '()) (words-out '()))
+    ""
+    (let ((return-result (lambda (idx) (substring str 0 idx))))
+      (with-input-from-string str
+        (lambda ()
+          (let loop ((state 'init)
+                     (chr (read-char))
+                     (index 0)
+                     (word-count 0))
             (cond
               ((eof-object? chr)
-               (return-result current-word words-out))
+               (return-result index))
+              ((and (eqv? state 'word)
+                    (char-set-contains? char-set:whitespace chr))
+               (let ((new-count (+ word-count 1)))
+                 (if (>= new-count n)
+                   (return-result index)
+                   (loop 'space (read-char) (+ index 1) new-count))))
               ((char-set-contains? char-set:whitespace chr)
-               (case state
-                 ((init)
-                  (loop 'init count (read-char) '() '()))
-                 ((word)
-                  (if (>= count n)
-                    (return-result current-word words-out)
-                    (loop 'space count (read-char) '() (cons (list->string (reverse current-word)) words-out))))
-                 ((space)
-                  (loop 'space count (read-char) '() words-out))))
+               (loop 'space (read-char) (+ index 1) word-count))
               (else
-                (case state
-                  ((init)
-                   (loop 'word count (read-char) (cons chr current-word) '()))
-                  ((word)
-                   (loop 'word count (read-char) (cons chr current-word) words-out))
-                  ((space)
-                   (loop 'word (+ count 1) (read-char) (list chr) words-out)))))))))))
-
-(define (text->teaser txt #!optional (length #f))
-  (let ((wds (words txt (or length (%default-teaser-length%)))))
-    (string-append (string-join wds " ") " ...")))
+                (loop 'word (read-char) (+ index 1) word-count)))))))))
 
 (define (title->alias title)
   (with-output-to-string
