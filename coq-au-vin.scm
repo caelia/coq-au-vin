@@ -28,6 +28,8 @@
         (use utf8-srfi-14)
 
         (use uri-common)
+        ;; KLUDGING s11n!
+        (use sxml-transforms)
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  GLOBAL PARAMETERS  -----------------------------------------------
@@ -234,6 +236,22 @@
   (string->sha1sum
     (sprintf "~A:~A:~A" uname (current-seconds) (random 4096))))
 
+;;; The big bad s11n kludge!
+(define sxml-normalization-rules
+  `((*text* . ,(lambda (_ x) (->string x)))
+    (*default* . ,(lambda (tag children)
+                    (cons tag
+                          (append-map
+                           (lambda (x)
+                             (cond ((not (list? x)) (list x))
+                                   ((null? x) x)
+                                   ((symbol? (car x)) (list x))
+                                   (else x)))
+                           children))))))
+
+(define (normalize-sxml doc)
+  (pre-post-order* doc sxml-normalization-rules))
+
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 
@@ -433,7 +451,7 @@
     (if raw
       raw-body
       (let ((sanitized-body (escape-html raw-body)))
-        (markdown->sxml sanitized-body)))))
+        (normalize-sxml (markdown->sxml sanitized-body))))))
 
 (define (prepare-article-vars article-data date-format #!optional (raw #f))
   (foldl
