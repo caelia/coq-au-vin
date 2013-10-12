@@ -152,7 +152,9 @@
 (define (text->teaser str #!optional (n (%default-teaser-length%)))
   (if (< n 1)
     ""
-    (let ((return-result (lambda (idx) (substring str 0 idx))))
+    (let ((return-result
+            (lambda (idx)
+              (string-append (substring str 0 idx) " ... "))))
       (with-input-from-string str
         (lambda ()
           (let loop ((state 'init)
