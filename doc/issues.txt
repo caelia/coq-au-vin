@@ -1,0 +1,10 @@
+* Teaser formatting: teasers seem to be only partially Markdown-
+  formatted. Is this due to linebreaks being removed in pre-
+  processing?
+
+* Missing tags: sometimes I enter multiple tags in the form,
+  but only one shows up.
+
+* Some form fields display default text, others don't. E.g.
+  on the current form has "Enter Series Title" in the Series
+  input field, but the Subtitle input is blank. 
