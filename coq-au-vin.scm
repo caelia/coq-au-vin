@@ -154,7 +154,7 @@
     ""
     (let ((return-result
             (lambda (idx)
-              (string-append (substring str 0 idx) " ... "))))
+              (string-append (substring str 0 idx) " ... \n"))))
       (with-input-from-string str
         (lambda ()
           (let loop ((state 'init)
