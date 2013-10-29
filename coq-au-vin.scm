@@ -19,6 +19,7 @@
   
         (use lowdown)
         (use srfi-69)
+        (use random-bsd)
         (use crypt)
         ; ;; FIXME: Need a better password hash! 
         (use simple-sha1)
@@ -32,7 +33,7 @@
         (use sxml-transforms)
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
-;;; ----  GLOBAL PARAMETERS  -----------------------------------------------
+;;; ----  GLOBAL PARAMETERS & CONSTANTS ------------------------------------
 
 (define %blog-root% (make-parameter #f))
 
@@ -51,6 +52,8 @@
 (define %first-node-id% (make-parameter "10000001"))
 
 (define %default-roles% (make-parameter '("admin" "editor" "author" "member" "guest")))
+
+(define +lucky-number+ (random-fixnum 1000000))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -219,8 +222,8 @@
   (hash-table->alist (%config%)))
 
 (define (get-session-key uname)
-  (string->sha1sum
-    (sprintf "~A:~A:~A" uname (current-seconds) (random 4096))))
+  (crypt
+    (sprintf "~A:~A:~A:~A" uname (current-seconds) +lucky-number+ (random 4096))))
 
 ;;; The big bad s11n kludge!
 (define sxml-normalization-rules
@@ -315,6 +318,39 @@
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  USERS, SESSIONS, AUTHENTICATION  ---------------------------------
+
+(define session-store (make-hash-table))
+
+(define-record-type session-data
+  (make-session-data uname ip role expires)
+  session-data?
+  (uname session-uname)
+  (ip session-ip)
+  (role session-role)
+  (expires session-expires session-expires-set!))
+
+(define (session-expired? session)
+  (< (session-expires session) (current-seconds)))
+
+(define (session-refresh! session)
+  (let ((new-exp (+ (current-seconds) (%session-timeout%))))
+    (session-expires-set! session new-exp)))
+
+(define (delete-session! key)
+  (hash-table-delete! session-store key)
+  #f)
+
+(define (user-session? uname)
+  (let* ((store-contents (hash-table->alist session-store))
+         (sess
+           (find
+             (lambda (elt)
+               (string=? (session-uname (cdr elt)) uname)))))
+    (and sess
+         (if (session-expired? (cdr sess))
+           (delete-session! (car sess))
+           #t))))
+
 
 (define (register-roles #!optional (roles (%default-roles%)))
   ;((db:connect))
