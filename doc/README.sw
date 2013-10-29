@@ -14,7 +14,7 @@ Matt Gushee <matt@gushee.net>
 
 === Requirements
 
-[[utf8]], [[uri-common]], [[sql-de-lite]], [[civet]], [[lowdown]], [[simple-sha1]]
+[[utf8]], [[uri-common]], [[sql-de-lite]], [[civet]], [[lowdown]], [[crypt]], [[simple-sha1]]
 
 === Introduction
 
@@ -203,6 +203,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 
 === Version History
+
+;0.1.3:     Switched password hashing to (crypt).
 
 ;0.1.2:     Fixed formatting bug in article teasers.
 

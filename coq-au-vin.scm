@@ -19,7 +19,7 @@
   
         (use lowdown)
         (use srfi-69)
-        ; (use crypt)
+        (use crypt)
         ; ;; FIXME: Need a better password hash! 
         (use simple-sha1)
 
@@ -332,30 +332,29 @@
       (unless (member role roles)
       ((db:disconnect))
       (eprintf "'~A' is not a recognized role.\n" role)))
-    (let ((phash (string->sha1sum password)))
+    (let ((phash (crypt password)))
       (if (blank? disp-name)
         ((db:add-user) uname phash email role))
         ((db:add-user) uname phash email role disp-name))
     ((db:disconnect))))
 
 (define (login uname password #!optional (keygen get-session-key))
-  (let ((input-hash (string->sha1sum password)))
-    ((db:connect))
-    (let ((result
-            (and ((db:can-login?) uname)
-                 (let ((stored-hash ((db:get-passhash) uname)))
-                   (if (and stored-hash (string=? input-hash stored-hash))
-                     (let* ((logged-in ((db:is-logged-in?) uname))
-                            (session-key (or logged-in (keygen uname))))
-                       (if logged-in
-                         ((db:refresh-session) session-key (+ (current-seconds) (%session-timeout%)))
-                         ((db:add-session) session-key uname (+ (current-seconds) (%session-timeout%))))
-                       session-key)
-                     (begin
-                       ((db:bad-login) uname)
-                       #f))))))
-      ((db:disconnect))
-      result)))
+  ((db:connect))
+  (let ((result
+          (and ((db:can-login?) uname)
+               (let ((stored-hash ((db:get-passhash) uname)))
+                 (if (and stored-hash (string=? stored-hash (crypt password stored-hash)))
+                   (let* ((logged-in ((db:is-logged-in?) uname))
+                          (session-key (or logged-in (keygen uname))))
+                     (if logged-in
+                       ((db:refresh-session) session-key (+ (current-seconds) (%session-timeout%)))
+                       ((db:add-session) session-key uname (+ (current-seconds) (%session-timeout%))))
+                     session-key)
+                   (begin
+                     ((db:bad-login) uname)
+                     #f))))))
+    ((db:disconnect))
+    result))
 
 (define (logout #!key (uname #f) (session #f))
   (when (or uname session)
