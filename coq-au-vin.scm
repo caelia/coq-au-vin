@@ -631,12 +631,11 @@
 
 ;;; TEMPORARY! Just until we have sessions working!
 (define (check-pass uname password)
-  (let ((input-hash (string->sha1sum password)))
-    ((db:connect))
-    (let* ((stored-hash ((db:get-passhash) uname))
-           (result (and stored-hash (string=? input-hash stored-hash))))
-      ((db:disconnect))
-      result)))
+  ((db:connect))
+  (let* ((stored-hash ((db:get-passhash) uname))
+         (result (and stored-hash (string=? stored-hash (crypt password stored-hash)))))
+    ((db:disconnect))
+    result))
 
 (define (add-article form-data #!optional (out (current-output-port)))
   (let ((page-vars
