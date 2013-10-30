@@ -221,10 +221,6 @@
 (define (config*)
   (hash-table->alist (%config%)))
 
-(define (get-session-key uname)
-  (crypt
-    (sprintf "~A:~A:~A:~A" uname (current-seconds) +lucky-number+ (random 4096))))
-
 ;;; The big bad s11n kludge!
 (define sxml-normalization-rules
   `((*text* . ,(lambda (_ x) (->string x)))
@@ -319,6 +315,10 @@
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  USERS, SESSIONS, AUTHENTICATION  ---------------------------------
 
+(define (get-session-key uname)
+  (crypt
+    (sprintf "~A:~A:~A:~A" uname (current-seconds) +lucky-number+ (random 4096))))
+
 (define session-store (make-hash-table))
 
 (define-record-type session-data
@@ -329,18 +329,27 @@
   (role session-role)
   (expires session-expires session-expires-set!))
 
-(define (session-expired? session)
-  (< (session-expires session) (current-seconds)))
-
-(define (session-refresh! session)
-  (let ((new-exp (+ (current-seconds) (%session-timeout%))))
-    (session-expires-set! session new-exp)))
+(define (create-session! key uname ip role)
+  (let ((expires (+ (current-seconds) (%session-timeout%)))
+        (sdata (make-session-data uname ip role expires)))
+    (hash-table-set! session-store key sdata)))
 
 (define (delete-session! key)
   (hash-table-delete! session-store key)
   #f)
 
-(define (user-session? uname)
+;;; FIXME!!! mismatch: session obj vs. session key object
+(define (session-expired? session)
+  (let ((expired (< (session-expires session) (current-seconds))))
+    (if expired
+      (not (delete-session! key))
+      #f)))
+
+(define (session-refresh! session)
+  (let ((new-exp (+ (current-seconds) (%session-timeout%))))
+    (session-expires-set! session new-exp)))
+
+(define (logged-in? uname)
   (let* ((store-contents (hash-table->alist session-store))
          (sess
            (find
@@ -349,8 +358,19 @@
     (and sess
          (if (session-expired? (cdr sess))
            (delete-session! (car sess))
-           #t))))
+           (car sess)))))
 
+(define (authorized? session action #!optional (resource #f))
+  (let ((role (string->symbol (session-role session))))
+    (case action
+      ((create-article)
+       (or (eqv? role 'admin) (eqv? role 'editor) (eqv? role 'author)))
+      ((edit-article)
+       (or (eqv? role 'admin) (eqv? role 'editor)))
+      ((view-content)
+       #t)
+      (else
+        #f))))
 
 (define (register-roles #!optional (roles (%default-roles%)))
   ;((db:connect))
@@ -374,17 +394,18 @@
         ((db:add-user) uname phash email role disp-name))
     ((db:disconnect))))
 
-(define (login uname password #!optional (keygen get-session-key))
+(define (login uname password ip #!optional (keygen get-session-key))
   ((db:connect))
   (let ((result
           (and ((db:can-login?) uname)
                (let ((stored-hash ((db:get-passhash) uname)))
                  (if (and stored-hash (string=? stored-hash (crypt password stored-hash)))
-                   (let* ((logged-in ((db:is-logged-in?) uname))
+                   (let* ((logged-in (logged-in? uname))
                           (session-key (or logged-in (keygen uname))))
                      (if logged-in
-                       ((db:refresh-session) session-key (+ (current-seconds) (%session-timeout%)))
-                       ((db:add-session) session-key uname (+ (current-seconds) (%session-timeout%))))
+                       (session-refresh! session-key (+ (current-seconds) (%session-timeout%)))
+                       (let ((role ((db:get-user-role) uname)))
+                         (create-session! session-key uname ip role (+ (current-seconds) (%session-timeout%)))))
                      session-key)
                    (begin
                      ((db:bad-login) uname)
@@ -394,11 +415,9 @@
 
 (define (logout #!key (uname #f) (session #f))
   (when (or uname session)
-    ((db:connect))
-    (let ((session-key (or session ((db:is-logged-in?) uname))))
+    (let ((session-key (or session (logged-in? uname))))
       (when session-key
-        ((db:delete-session) session-key))
-      ((db:disconnect)))))
+        (delete-session! session-key)))))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
