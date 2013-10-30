@@ -1,5 +1,5 @@
 ((license "BSD")
  (category web)
- (depends utf8 uri-common sql-de-lite civet lowdown simple-sha1)
+ (depends utf8 uri-common sql-de-lite civet lowdown crypt simple-sha1)
  (author "Matt Gushee")
  (synopsis "A simple [?] blogging platform."))

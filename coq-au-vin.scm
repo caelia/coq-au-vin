@@ -19,7 +19,8 @@
   
         (use lowdown)
         (use srfi-69)
-        ; (use crypt)
+        (use random-bsd)
+        (use crypt)
         ; ;; FIXME: Need a better password hash! 
         (use simple-sha1)
 
@@ -32,7 +33,7 @@
         (use sxml-transforms)
 
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
-;;; ----  GLOBAL PARAMETERS  -----------------------------------------------
+;;; ----  GLOBAL PARAMETERS & CONSTANTS ------------------------------------
 
 (define %blog-root% (make-parameter #f))
 
@@ -51,6 +52,8 @@
 (define %first-node-id% (make-parameter "10000001"))
 
 (define %default-roles% (make-parameter '("admin" "editor" "author" "member" "guest")))
+
+(define +lucky-number+ (random-fixnum 1000000))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -218,10 +221,6 @@
 (define (config*)
   (hash-table->alist (%config%)))
 
-(define (get-session-key uname)
-  (string->sha1sum
-    (sprintf "~A:~A:~A" uname (current-seconds) (random 4096))))
-
 ;;; The big bad s11n kludge!
 (define sxml-normalization-rules
   `((*text* . ,(lambda (_ x) (->string x)))
@@ -316,6 +315,63 @@
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  USERS, SESSIONS, AUTHENTICATION  ---------------------------------
 
+(define (get-session-key uname)
+  (crypt
+    (sprintf "~A:~A:~A:~A" uname (current-seconds) +lucky-number+ (random 4096))))
+
+(define session-store (make-hash-table))
+
+(define-record-type session-data
+  (make-session-data uname ip role expires)
+  session-data?
+  (uname session-uname)
+  (ip session-ip)
+  (role session-role)
+  (expires session-expires session-expires-set!))
+
+(define (create-session! key uname ip role)
+  (let ((expires (+ (current-seconds) (%session-timeout%)))
+        (sdata (make-session-data uname ip role expires)))
+    (hash-table-set! session-store key sdata)))
+
+(define (delete-session! key)
+  (hash-table-delete! session-store key)
+  #f)
+
+;;; FIXME!!! mismatch: session obj vs. session key object
+(define (session-expired? session)
+  (let ((expired (< (session-expires session) (current-seconds))))
+    (if expired
+      (not (delete-session! key))
+      #f)))
+
+(define (session-refresh! session)
+  (let ((new-exp (+ (current-seconds) (%session-timeout%))))
+    (session-expires-set! session new-exp)))
+
+(define (logged-in? uname)
+  (let* ((store-contents (hash-table->alist session-store))
+         (sess
+           (find
+             (lambda (elt)
+               (string=? (session-uname (cdr elt)) uname)))))
+    (and sess
+         (if (session-expired? (cdr sess))
+           (delete-session! (car sess))
+           (car sess)))))
+
+(define (authorized? session action #!optional (resource #f))
+  (let ((role (string->symbol (session-role session))))
+    (case action
+      ((create-article)
+       (or (eqv? role 'admin) (eqv? role 'editor) (eqv? role 'author)))
+      ((edit-article)
+       (or (eqv? role 'admin) (eqv? role 'editor)))
+      ((view-content)
+       #t)
+      (else
+        #f))))
+
 (define (register-roles #!optional (roles (%default-roles%)))
   ;((db:connect))
   (for-each (db:add-role) roles)
@@ -332,38 +388,36 @@
       (unless (member role roles)
       ((db:disconnect))
       (eprintf "'~A' is not a recognized role.\n" role)))
-    (let ((phash (string->sha1sum password)))
+    (let ((phash (crypt password)))
       (if (blank? disp-name)
         ((db:add-user) uname phash email role))
         ((db:add-user) uname phash email role disp-name))
     ((db:disconnect))))
 
-(define (login uname password #!optional (keygen get-session-key))
-  (let ((input-hash (string->sha1sum password)))
-    ((db:connect))
-    (let ((result
-            (and ((db:can-login?) uname)
-                 (let ((stored-hash ((db:get-passhash) uname)))
-                   (if (and stored-hash (string=? input-hash stored-hash))
-                     (let* ((logged-in ((db:is-logged-in?) uname))
-                            (session-key (or logged-in (keygen uname))))
-                       (if logged-in
-                         ((db:refresh-session) session-key (+ (current-seconds) (%session-timeout%)))
-                         ((db:add-session) session-key uname (+ (current-seconds) (%session-timeout%))))
-                       session-key)
-                     (begin
-                       ((db:bad-login) uname)
-                       #f))))))
-      ((db:disconnect))
-      result)))
+(define (login uname password ip #!optional (keygen get-session-key))
+  ((db:connect))
+  (let ((result
+          (and ((db:can-login?) uname)
+               (let ((stored-hash ((db:get-passhash) uname)))
+                 (if (and stored-hash (string=? stored-hash (crypt password stored-hash)))
+                   (let* ((logged-in (logged-in? uname))
+                          (session-key (or logged-in (keygen uname))))
+                     (if logged-in
+                       (session-refresh! session-key (+ (current-seconds) (%session-timeout%)))
+                       (let ((role ((db:get-user-role) uname)))
+                         (create-session! session-key uname ip role (+ (current-seconds) (%session-timeout%)))))
+                     session-key)
+                   (begin
+                     ((db:bad-login) uname)
+                     #f))))))
+    ((db:disconnect))
+    result))
 
 (define (logout #!key (uname #f) (session #f))
   (when (or uname session)
-    ((db:connect))
-    (let ((session-key (or session ((db:is-logged-in?) uname))))
+    (let ((session-key (or session (logged-in? uname))))
       (when session-key
-        ((db:delete-session) session-key))
-      ((db:disconnect)))))
+        (delete-session! session-key)))))
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
@@ -632,12 +686,11 @@
 
 ;;; TEMPORARY! Just until we have sessions working!
 (define (check-pass uname password)
-  (let ((input-hash (string->sha1sum password)))
-    ((db:connect))
-    (let* ((stored-hash ((db:get-passhash) uname))
-           (result (and stored-hash (string=? input-hash stored-hash))))
-      ((db:disconnect))
-      result)))
+  ((db:connect))
+  (let* ((stored-hash ((db:get-passhash) uname))
+         (result (and stored-hash (string=? stored-hash (crypt password stored-hash)))))
+    ((db:disconnect))
+    result))
 
 (define (add-article form-data #!optional (out (current-output-port)))
   (let ((page-vars
