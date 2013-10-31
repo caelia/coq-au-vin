@@ -351,6 +351,10 @@
            (delete-session! (car sess))
            #t))))
 
+(define (add-session key uname ip role)
+  (let* ((expires (+ (current-seconds (%session-timeout%))))
+         (sdata (make-session-data uname ip role expires)))
+    (hash-table-set! session-store sdata)))
 
 (define (register-roles #!optional (roles (%default-roles%)))
   ;((db:connect))
