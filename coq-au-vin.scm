@@ -315,7 +315,7 @@
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  USERS, SESSIONS, AUTHENTICATION  ---------------------------------
 
-(define (get-session-key uname)
+(define (mk-session-key uname)
   (crypt
     (sprintf "~A:~A:~A:~A" uname (current-seconds) +lucky-number+ (random 4096))))
 
@@ -349,6 +349,7 @@
   (let ((new-exp (+ (current-seconds) (%session-timeout%))))
     (session-expires-set! session new-exp)))
 
+;; FIXME: need to check that user is logged in for correct IP
 (define (logged-in? uname)
   (let* ((store-contents (hash-table->alist session-store))
          (sess
@@ -394,22 +395,24 @@
         ((db:add-user) uname phash email role disp-name))
     ((db:disconnect))))
 
-(define (login uname password ip #!optional (keygen get-session-key))
+(define (login uname password ip #!optional (keygen mk-session-key))
   ((db:connect))
   (let ((result
           (and ((db:can-login?) uname)
                (let ((stored-hash ((db:get-passhash) uname)))
-                 (if (and stored-hash (string=? stored-hash (crypt password stored-hash)))
+                 (if (and stored-hash
+                          (string=? stored-hash (crypt password stored-hash)))
                    (let* ((logged-in (logged-in? uname))
-                          (session-key (or logged-in (keygen uname))))
+                          (session-key (or logged-in (keygen uname)))
+                          (exp-time (+ (current-seconds) (%session-timeout))))
                      (if logged-in
-                       (session-refresh! session-key (+ (current-seconds) (%session-timeout%)))
+                       (session-refresh! session-key exp-time))
                        (let ((role ((db:get-user-role) uname)))
-                         (create-session! session-key uname ip role (+ (current-seconds) (%session-timeout%)))))
+                         (create-session! session-key uname ip role exp-time))))
                      session-key)
                    (begin
                      ((db:bad-login) uname)
-                     #f))))))
+                     #f)))))
     ((db:disconnect))
     result))
 
