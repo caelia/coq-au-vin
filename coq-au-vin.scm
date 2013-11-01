@@ -330,20 +330,23 @@
   (expires session-expires session-expires-set!))
 
 (define (create-session! key uname ip role)
-  (let ((expires (+ (current-seconds) (%session-timeout%)))
-        (sdata (make-session-data uname ip role expires)))
+  (let* ((expires (+ (current-seconds) (%session-timeout%)))
+         (sdata (make-session-data uname ip role expires)))
     (hash-table-set! session-store key sdata)))
 
 (define (delete-session! key)
   (hash-table-delete! session-store key)
   #f)
 
-;;; FIXME!!! mismatch: session obj vs. session key object
-(define (session-expired? session)
+(define (session-expired? key session)
   (let ((expired (< (session-expires session) (current-seconds))))
     (if expired
       (not (delete-session! key))
       #f)))
+
+(define (session-valid? key session ip)
+  (and (not (session-expired? key session))
+       (string=? (session-ip session) ip)))
 
 (define (session-refresh! session)
   (let ((new-exp (+ (current-seconds) (%session-timeout%))))
@@ -355,23 +358,29 @@
          (sess
            (find
              (lambda (elt)
-               (string=? (session-uname (cdr elt)) uname)))))
+               (string=? (session-uname (cdr elt)) uname))
+             store-contents)))
     (and sess
-         (if (session-expired? (cdr sess))
-           (delete-session! (car sess))
-           (car sess)))))
+         (let ((key (car sess))
+               (obj (cdr sess)))
+           (if (session-expired? key obj)
+             (delete-session! key)
+             key)))))
 
-(define (authorized? session action #!optional (resource #f))
-  (let ((role (string->symbol (session-role session))))
-    (case action
-      ((create-article)
-       (or (eqv? role 'admin) (eqv? role 'editor) (eqv? role 'author)))
-      ((edit-article)
-       (or (eqv? role 'admin) (eqv? role 'editor)))
-      ((view-content)
-       #t)
-      (else
-        #f))))
+(define (authorized? session-key action ip #!optional (resource #f))
+  (let ((session (hash-table-ref session-store session-key)))
+    (and (session-valid? session-key session ip)
+         (let ((role (string->symbol (session-role session))))
+           (cond
+             ((eqv? role 'admin) #t)
+             ((eqv? action 'create-article)
+              (or (eqv? role 'editor) (eqv? role 'author)))
+             ((eqv? action 'edit-article)
+              (eqv? role 'editor))
+             ((eqv? action 'view-content)
+              #t)
+             (else
+               #f))))))
 
 (define (register-roles #!optional (roles (%default-roles%)))
   ;((db:connect))
@@ -404,15 +413,15 @@
                           (string=? stored-hash (crypt password stored-hash)))
                    (let* ((logged-in (logged-in? uname))
                           (session-key (or logged-in (keygen uname)))
-                          (exp-time (+ (current-seconds) (%session-timeout))))
+                          (exp-time (+ (current-seconds) (%session-timeout%))))
                      (if logged-in
-                       (session-refresh! session-key exp-time))
+                       (session-refresh! session-key exp-time)
                        (let ((role ((db:get-user-role) uname)))
-                         (create-session! session-key uname ip role exp-time))))
+                         (create-session! session-key uname ip role exp-time)))
                      session-key)
                    (begin
                      ((db:bad-login) uname)
-                     #f)))))
+                     #f))))))
     ((db:disconnect))
     result))
 
@@ -726,15 +735,35 @@
     ((db:connect))
     (let ((vars
             (if (and uname password (check-pass uname password))
-              (let* ((node-id (if (node-id? id/alias) id/alias ((db:alias->node-id) id/alias)))
-                     (data (prepare-form-data form-data #t))
-                     (data+ (cons node-id (map cdr data))))
+              (let* ((node-id
+                       (if (node-id? id/alias)
+                         id/alias
+                         ((db:alias->node-id) id/alias)))
+                     (data
+                       (prepare-form-data form-data #t))
+                     (data+
+                       (cons node-id (map cdr data))))
                 (apply (db:update-article) data+)
                 `((message . "Article successfully updated.") (msg_class . "info")
                   (proceed_to . ,(string-append "/articles/" id/alias)) ,@page-vars))
-              `((message . "User name and/or password is incorrect.") (msg_class . "error")
-                (proceed_to . ,(string-append "/articles/" id/alias "/edit")) ,@page-vars))))
+              `((message . "User name and/or password is incorrect.")
+                (msg_class . "error")
+                (proceed_to . ,(string-append "/articles/" id/alias "/edit"))
+                ,@page-vars))))
       ((db:disconnect))
+      (cvt:render "msg.html" (cvt:make-context vars: vars) port: out))))
+
+(define (with-authorization session action ip referer thunk
+                            #!key (resource #f) (out (current-output-port)))
+  (if (authorized? session action ip resource)
+    (thunk)
+    (let* ((page-vars
+            (config-get
+              'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
+              'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
+           (vars
+             `((message . "You are not authorized to perform this action.")
+               (msg_class . "error") (proceed_to . ,referer) ,@page-vars)))
       (cvt:render "msg.html" (cvt:make-context vars: vars) port: out))))
 
 (define (app-init #!key (site-path #f) (template-path #f))
