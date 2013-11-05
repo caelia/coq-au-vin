@@ -22,7 +22,7 @@
         (use random-bsd)
         (use crypt)
         ; ;; FIXME: Need a better password hash! 
-        (use simple-sha1)
+        ; (use simple-sha1)
 
         (use utf8)
         (use utf8-srfi-13)
