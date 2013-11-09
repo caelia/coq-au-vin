@@ -21,8 +21,6 @@
         (use srfi-69)
         (use random-bsd)
         (use crypt)
-        ; ;; FIXME: Need a better password hash! 
-        ; (use simple-sha1)
 
         (use utf8)
         (use utf8-srfi-13)
@@ -52,6 +50,9 @@
 (define %first-node-id% (make-parameter "10000001"))
 
 (define %default-roles% (make-parameter '("admin" "editor" "author" "member" "guest")))
+
+;;; This should only be set to #t for demo/debugging purposes!
+(define %waive-authorization% (make-parameter #f))
 
 (define +lucky-number+ (random-fixnum 1000000))
 
@@ -329,6 +330,12 @@
   (role session-role)
   (expires session-expires session-expires-set!))
 
+(define-record-type credentials
+  (make-credentials session ip) 
+  credentials?
+  (session cred-session)
+  (ip cred-ip))
+
 (define (create-session! key uname ip role)
   (let* ((expires (+ (current-seconds) (%session-timeout%)))
          (sdata (make-session-data uname ip role expires)))
@@ -345,7 +352,8 @@
       #f)))
 
 (define (session-valid? key session ip)
-  (and (not (session-expired? key session))
+  (and key
+       (not (session-expired? key session))
        (string=? (session-ip session) ip)))
 
 (define (session-refresh! session)
@@ -368,19 +376,23 @@
              key)))))
 
 (define (authorized? session-key action ip #!optional (resource #f))
-  (let ((session (hash-table-ref session-store session-key)))
-    (and (session-valid? session-key session ip)
-         (let ((role (string->symbol (session-role session))))
-           (cond
-             ((eqv? role 'admin) #t)
-             ((eqv? action 'create-article)
-              (or (eqv? role 'editor) (eqv? role 'author)))
-             ((eqv? action 'edit-article)
-              (eqv? role 'editor))
-             ((eqv? action 'view-content)
-              #t)
-             (else
-               #f))))))
+  (or (eqv? action 'view-content)
+      (let ((session (hash-table-ref session-store session-key)))
+        (and (session-valid? session-key session ip)
+             (let ((role (string->symbol (session-role session))))
+               (cond
+                 ((eqv? role 'admin) #t)
+                 ((eqv? action 'create-article)
+                  (or (eqv? role 'editor) (eqv? role 'author)))
+                 ((eqv? action 'edit-article)
+                  (eqv? role 'editor))
+                 (else
+                   #f)))))))
+
+(define (authorize credentials action #!optional (resource #f))
+  (or (%waive-authorization%)
+      (authorized? session-key action ip resource)
+      (abort (make-property-condition 'unauthorized))))
 
 (define (register-roles #!optional (roles (%default-roles%)))
   ;((db:connect))
@@ -601,9 +613,9 @@
          (vars* (prepare-article-vars article-data date-format))
          (page-vars
            (config-get
-             'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
-             'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
-         (vars `((articleID . ,id/alias) ,@page-vars ,@vars*))
+             'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
+             'copyright_holders 'rights_statement 'html_title 'body_classes))
+         (vars `((article_id . ,id/alias) ,@page-vars ,@vars*))
          (ctx (cvt:make-context vars: vars)))
     ((db:disconnect))
     (cvt:render "article.html" ctx port: out)))
@@ -643,8 +655,8 @@
                  list-data))
              (page-vars
                (config-get
-                 'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
-                 'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
+                 'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
+                 'copyright_holders 'rights_statement 'html_title 'body_classes))
              (vars
                `((self_base_url . ,self-base-url) (simple_pager ,@simple-pager)
                  (articles ,@list-vars) ,@page-vars))
@@ -662,8 +674,8 @@
   (let* ((list-data ((db:get-meta-list) subject))
          (page-vars
            (config-get
-             'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
-             'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
+             'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
+             'copyright_holders 'rights_statement 'html_title 'body_classes))
          (vars `((subject . ,(symbol->string subject)) (metadata_items . ,list-data) ,@page-vars))
          (ctx (cvt:make-context vars: vars)))
     ((db:disconnect))
@@ -677,8 +689,8 @@
 (define (get-new-article-form/html #!optional (out (current-output-port)))
   (let* ((vars
            (config-get
-             'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
-             'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
+             'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
+             'copyright_holders 'rights_statement 'html_title 'body_classes))
          (ctx (cvt:make-context vars: vars)))
     (cvt:render "edit.html" ctx port: out)))
 
@@ -689,8 +701,8 @@
          (vars* (prepare-article-vars article-data "%Y-%m-%d" #t))
          (page-vars
            (config-get
-             'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
-             'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
+             'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
+             'copyright_holders 'rights_statement 'html_title 'body_classes))
          (vars `((articleID . ,id/alias) ,@page-vars ,@vars*))
          (ctx (cvt:make-context vars: vars)))
     ((db:disconnect))
@@ -707,8 +719,8 @@
 (define (add-article form-data #!optional (out (current-output-port)))
   (let ((page-vars
           (config-get
-            'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
-            'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
+            'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
+            'copyright_holders 'rights_statement 'html_title 'body_classes))
         (uname (alist-ref 'uname form-data))
         (password (alist-ref 'password form-data)))
     ((db:connect))
@@ -728,8 +740,8 @@
 (define (update-article id/alias form-data #!optional (out (current-output-port)))
   (let ((page-vars
           (config-get
-            'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
-            'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
+            'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
+            'copyright_holders 'rights_statement 'html_title 'body_classes))
         (uname (alist-ref 'uname form-data))
         (password (alist-ref 'password form-data)))
     ((db:connect))
@@ -753,18 +765,33 @@
       ((db:disconnect))
       (cvt:render "msg.html" (cvt:make-context vars: vars) port: out))))
 
-(define (with-authorization session action ip referer thunk
-                            #!key (resource #f) (out (current-output-port)))
-  (if (authorized? session action ip resource)
-    (thunk)
-    (let* ((page-vars
-            (config-get
-              'urlScheme 'hostName 'bodyMD 'jquerySrc 'canEdit 'copyright_year
-              'copyright_holders 'rights_statement 'htmlTitle 'bodyClasses))
-           (vars
-             `((message . "You are not authorized to perform this action.")
-               (msg_class . "error") (proceed_to . ,referer) ,@page-vars)))
-      (cvt:render "msg.html" (cvt:make-context vars: vars) port: out))))
+(define (webform-login form-data ip #!optional (out (current-output-port)))
+  (let* ((page-vars
+           (config-get
+             'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
+             'copyright_holders 'rights_statement 'html_title 'body_classes))
+         (uname (alist-ref 'uname form-data))
+         (password (alist-ref 'password form-data))
+         (session (login uname password ip))
+         (vars
+           (if session
+             `((message . ,(sprintf "You are logged in as ~A." uname))
+               (msg_class . "info") (proceed_to . "/") ,@page-vars)
+             `((message . ,(sprintf "Login failed." uname))
+               (msg_class . "error") (proceed_to . "/login") ,@page-vars))))
+    (values
+      (cvt:render "msg.html" (cvt:make-context vars: vars) port: out)
+      session)))
+
+(define (unauthorized-message/html referer out)
+  (let* ((page-vars
+          (config-get
+            'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
+            'copyright_holders 'rights_statement 'html_title 'body_classes))
+         (vars
+           `((message . "You are not authorized to perform this action.")
+             (msg_class . "error") (proceed_to . ,referer) ,@page-vars)))
+    (cvt:render "msg.html" (cvt:make-context vars: vars) port: out)))
 
 (define (app-init #!key (site-path #f) (template-path #f))
   (when site-path
