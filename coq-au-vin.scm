@@ -336,9 +336,8 @@
   (session cred-session)
   (ip cred-ip))
 
-(define (create-session! key uname ip role)
-  (let* ((expires (+ (current-seconds) (%session-timeout%)))
-         (sdata (make-session-data uname ip role expires)))
+(define (create-session! key uname ip role expires)
+  (let* ((sdata (make-session-data uname ip role expires)))
     (hash-table-set! session-store key sdata)))
 
 (define (delete-session! key)
@@ -353,12 +352,12 @@
 
 (define (session-valid? key session ip)
   (and key
+       session
        (not (session-expired? key session))
        (string=? (session-ip session) ip)))
 
-(define (session-refresh! session)
-  (let ((new-exp (+ (current-seconds) (%session-timeout%))))
-    (session-expires-set! session new-exp)))
+(define (session-refresh! session new-exp)
+  (session-expires-set! session new-exp))
 
 ;; FIXME: need to check that user is logged in for correct IP
 (define (logged-in? uname)
@@ -377,22 +376,25 @@
 
 (define (authorized? session-key action ip #!optional (resource #f))
   (or (eqv? action 'view-content)
-      (let ((session (hash-table-ref session-store session-key)))
-        (and (session-valid? session-key session ip)
-             (let ((role (string->symbol (session-role session))))
-               (cond
-                 ((eqv? role 'admin) #t)
-                 ((eqv? action 'create-article)
-                  (or (eqv? role 'editor) (eqv? role 'author)))
-                 ((eqv? action 'edit-article)
-                  (eqv? role 'editor))
-                 (else
-                   #f)))))))
+      (and session-key
+           (let ((session
+                   (and (hash-table-exists? session-store session-key)
+                        (hash-table-ref session-store session-key))))
+             (and (session-valid? session-key session ip)
+                  (let ((role (string->symbol (session-role session))))
+                    (cond
+                      ((eqv? role 'admin) #t)
+                      ((eqv? action 'create-article)
+                       (or (eqv? role 'editor) (eqv? role 'author)))
+                      ((eqv? action 'edit-article)
+                       (eqv? role 'editor))
+                      (else
+                        #f))))))))
 
-(define (authorize credentials action #!optional (resource #f))
-  (or (%waive-authorization%)
-      (authorized? session-key action ip resource)
-      (abort (make-property-condition 'unauthorized))))
+;(define (authorize credentials action #!optional (resource #f))
+  ;(or (%waive-authorization%)
+      ;(authorized? session-key action ip resource)
+      ;(abort (make-property-condition 'unauthorized))))
 
 (define (register-roles #!optional (roles (%default-roles%)))
   ;((db:connect))
@@ -708,32 +710,19 @@
     ((db:disconnect))
     (cvt:render "edit.html" ctx port: out)))
 
-;;; TEMPORARY! Just until we have sessions working!
-(define (check-pass uname password)
-  ((db:connect))
-  (let* ((stored-hash ((db:get-passhash) uname))
-         (result (and stored-hash (string=? stored-hash (crypt password stored-hash)))))
-    ((db:disconnect))
-    result))
-
 (define (add-article form-data #!optional (out (current-output-port)))
   (let ((page-vars
           (config-get
             'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
-            'copyright_holders 'rights_statement 'html_title 'body_classes))
-        (uname (alist-ref 'uname form-data))
-        (password (alist-ref 'password form-data)))
+            'copyright_holders 'rights_statement 'html_title 'body_classes)))
     ((db:connect))
     (let ((vars
-            (if (and uname password (check-pass uname password))
-              (let* ((data (prepare-form-data form-data))
-                     (node-id (get-node-id))
-                     (data+ (cons node-id (map cdr data))))
-                (apply (db:create-article) data+)
-                `((message . "Article successfully posted.") (msg_class . "info")
-                  (proceed_to . "/articles") ,@page-vars))
-              `((message . "User name and/or password is incorrect.") (msg_class . "error")
-                (proceed_to . "/articles/new") ,@page-vars))))
+            (let* ((data (prepare-form-data form-data))
+                   (node-id (get-node-id))
+                   (data+ (cons node-id (map cdr data))))
+              (apply (db:create-article) data+)
+              `((message . "Article successfully posted.") (msg_class . "info")
+                (proceed_to . "/articles") ,@page-vars))))
       ((db:disconnect))
       (cvt:render "msg.html" (cvt:make-context vars: vars) port: out))))
 
@@ -741,29 +730,29 @@
   (let ((page-vars
           (config-get
             'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
-            'copyright_holders 'rights_statement 'html_title 'body_classes))
-        (uname (alist-ref 'uname form-data))
-        (password (alist-ref 'password form-data)))
+            'copyright_holders 'rights_statement 'html_title 'body_classes)))
     ((db:connect))
     (let ((vars
-            (if (and uname password (check-pass uname password))
-              (let* ((node-id
-                       (if (node-id? id/alias)
-                         id/alias
-                         ((db:alias->node-id) id/alias)))
-                     (data
-                       (prepare-form-data form-data #t))
-                     (data+
-                       (cons node-id (map cdr data))))
-                (apply (db:update-article) data+)
-                `((message . "Article successfully updated.") (msg_class . "info")
-                  (proceed_to . ,(string-append "/articles/" id/alias)) ,@page-vars))
-              `((message . "User name and/or password is incorrect.")
-                (msg_class . "error")
-                (proceed_to . ,(string-append "/articles/" id/alias "/edit"))
-                ,@page-vars))))
+            (let* ((node-id
+                     (if (node-id? id/alias)
+                       id/alias
+                       ((db:alias->node-id) id/alias)))
+                   (data
+                     (prepare-form-data form-data #t))
+                   (data+
+                     (cons node-id (map cdr data))))
+              (apply (db:update-article) data+)
+              `((message . "Article successfully updated.") (msg_class . "info")
+                (proceed_to . ,(string-append "/articles/" id/alias)) ,@page-vars))))
       ((db:disconnect))
       (cvt:render "msg.html" (cvt:make-context vars: vars) port: out))))
+
+(define (get-login-form/html #!optional (out (current-output-port))) 
+  (let ((vars
+          (config-get
+            'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
+            'copyright_holders 'rights_statement 'html_title 'body_classes)))
+    (cvt:render "login.html" (cvt:make-context vars: vars) port: out)))
 
 (define (webform-login form-data ip #!optional (out (current-output-port)))
   (let* ((page-vars
@@ -777,13 +766,13 @@
            (if session
              `((message . ,(sprintf "You are logged in as ~A." uname))
                (msg_class . "info") (proceed_to . "/") ,@page-vars)
-             `((message . ,(sprintf "Login failed." uname))
+             `((message . "Login failed.")
                (msg_class . "error") (proceed_to . "/login") ,@page-vars))))
     (values
       (cvt:render "msg.html" (cvt:make-context vars: vars) port: out)
       session)))
 
-(define (unauthorized-message/html referer out)
+(define (unauthorized-message/html referer #!optional (out (current-output-port)))
   (let* ((page-vars
           (config-get
             'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
@@ -792,6 +781,9 @@
            `((message . "You are not authorized to perform this action.")
              (msg_class . "error") (proceed_to . ,referer) ,@page-vars)))
     (cvt:render "msg.html" (cvt:make-context vars: vars) port: out)))
+
+(define (unauthorized-message/json referer #!optional (out (current-output-port)))
+  #f)
 
 (define (app-init #!key (site-path #f) (template-path #f))
   (when site-path

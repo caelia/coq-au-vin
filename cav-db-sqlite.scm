@@ -306,7 +306,7 @@ SQL
   "SELECT email, role, display_name FROM users WHERE uname = ?;")
 
 (define get-user-role-query
-  "SELECT role FROM users WHERE uname = ?;")
+  "SELECT roles.name FROM users, roles WHERE uname = ? AND roles.id = users.role;")
 
 (define update-password-query
   "UPDATE users SET passhash = ? WHERE uname = ?;")
@@ -324,8 +324,8 @@ SQL
   "SELECT passhash FROM users WHERE uname = ?;")
 
 (define bad-login-count-query
-  "SELECT count(id)
-      FROM bad_logins
+  "SELECT count(bad_logins.id)
+      FROM bad_logins, users
       WHERE user = users.id
       AND users.uname = ?;")
 
@@ -333,7 +333,7 @@ SQL
   "INSERT INTO bad_logins (user, time)
       SELECT id, ?
       FROM users
-      WHERE users.uname = '?';")
+      WHERE users.uname = ?;")
 
 (define clear-bad-logins-query
   "DELETE FROM bad_logins
@@ -439,7 +439,7 @@ SQL
          (s-add (sd:sql/transient conn add-bad-login-query))
          (s-clear (sd:sql/transient conn clear-bad-logins-query))
          (s-block (sd:sql/transient conn block-user-query)))
-    (let ((count (sd:query sd:fetch-value s-count)))
+    (let ((count (sd:query sd:fetch-value s-count uname)))
       ; (printf "bad login count: ~A\n" count)
       (if (and count (>= count tries))
         (begin
