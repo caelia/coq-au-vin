@@ -2,9 +2,7 @@
 
 === Description
 
-Civet is an XML-based templating system. It is intended primarily for
-generating dynamic web pages in XHTML, but may be useful for other XML
-applications.
+Coq au Vin is a lightweight blogging platform.
 
 [[toc:]]
 
