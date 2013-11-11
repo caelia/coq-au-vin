@@ -139,6 +139,15 @@
       (pp obj))
     #:append))
 
+(define (ldiff l1 l2)
+  (foldl
+    (lambda (result elt)
+      (if (member elt l2)
+        result
+        (cons elt result)))
+    '()
+    l1))
+
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  INITIAL SETUP  ---------------------------------------------------
 
@@ -679,6 +688,34 @@ SQL
              (r-ptno (sd:query sd:fetch st-pn id)))
         `(,id ,(car r-ptno))))))
 
+(define (%set-new-article-categories node-id categories)
+  (when (pair? categories)
+    (let* ((all (%get-all-categories))
+           (create (ldiff categories all)))
+      (when (pair? create)
+        (for-each
+          (lambda (c) (%create-category c))
+          create)))
+    (let* ((conn (current-connection))
+           (st (sd:sql conn add-article-category-query)))
+      (for-each
+        (lambda (cat) (sd:exec st node-id cat))
+        categories))))
+
+(define (%set-new-article-tags node-id tags)
+  (when (pair? tags)
+    (let* ((all (%get-all-tags))
+           (create (ldiff tags all)))
+      (when (pair? create)
+        (for-each
+          (lambda (t) (%create-tag t))
+          create)))
+    (let* ((conn (current-connection))
+           (st (sd:sql conn add-article-tag-query)))
+      (for-each
+        (lambda (tag) (sd:exec st node-id tag))
+        tags))))
+
 (define (%store-article-body node-id body #!optional (new #t))
   (let* ((content-path (make-pathname (%content-path%) node-id))
          (body-path (make-pathname content-path "body")))
@@ -704,12 +741,8 @@ SQL
     (for-each
       (lambda (auth) (sd:exec st-auth node-id auth))
       authors)
-    (for-each
-      (lambda (tag) (sd:exec st-tag node-id tag))
-      tags)
-    (for-each
-      (lambda (cat) (sd:exec st-cat node-id cat))
-      categories)
+    (%set-new-article-categories node-id categories)
+    (%set-new-article-tags node-id tags)
     (%store-article-body node-id body)))
 
 (define (%construct-update-query node-id fields)
@@ -747,15 +780,6 @@ SQL
     (apply sd:exec `(,st-art ,@vals ,node-id))
     ; Should be a bit more here ... e.g. authors, tags, categories, body ...
     #f))
-
-(define (ldiff l1 l2)
-  (foldl
-    (lambda (result elt)
-      (if (member elt l2)
-        result
-        (cons elt result)))
-    '()
-    l1))
 
 (define (%update-article-authors node-id authors)
   (let* ((conn (current-connection))

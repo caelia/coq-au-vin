@@ -560,6 +560,7 @@
     (string-split list-string ",")))
 
 (define (prepare-form-data form-data #!optional (update #f))
+  (log-obj "prepare-form-data" form-data)
   (let* ((verify-field
           (lambda (fname)
             (let ((val (alist-ref fname form-data)))
@@ -705,7 +706,7 @@
            (config-get
              'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
              'copyright_holders 'rights_statement 'html_title 'body_classes))
-         (vars `((articleID . ,id/alias) ,@page-vars ,@vars*))
+         (vars `((article_id . ,id/alias) ,@page-vars ,@vars*))
          (ctx (cvt:make-context vars: vars)))
     ((db:disconnect))
     (cvt:render "edit.html" ctx port: out)))
@@ -737,10 +738,8 @@
                      (if (node-id? id/alias)
                        id/alias
                        ((db:alias->node-id) id/alias)))
-                   (data
-                     (prepare-form-data form-data #t))
-                   (data+
-                     (cons node-id (map cdr data))))
+                   (data (prepare-form-data form-data #t))
+                   (data+ (cons node-id (map cdr data))))
               (apply (db:update-article) data+)
               `((message . "Article successfully updated.") (msg_class . "info")
                 (proceed_to . ,(string-append "/articles/" id/alias)) ,@page-vars))))
