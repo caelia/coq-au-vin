@@ -14,7 +14,7 @@ Matt Gushee <matt@gushee.net>
 
 === Requirements
 
-[[utf8]], [[uri-common]], [[sql-de-lite]], [[civet]], [[lowdown]], [[crypt]], [[simple-sha1]]
+[[utf8]], [[uri-common]], [[sql-de-lite]], [[civet]], [[lowdown]], [[crypt]]
 
 === Introduction
 
@@ -123,16 +123,29 @@ Generate an HTML form for editing an existing article, specified by ID/ALIAS.
 
 Given FORM-DATA (as an alist), this procedure adds a new article to the database.
 
-NOTE: as of version 0.1, any registered user may submit an article; since login sessions are
-not implemented, the form data must include a valid username and password.
-
 
 <procedure>(update-article ID/ALIAS FORM-DATA #!optional (out (current-output-port)))</procedure>
 
 Given an ID/ALIAS for an existing article and FORM-DATA (as an alist), this procedure
 updates the content and metadata of the specified article.
 
-As with {{add-article}} a valid username and password are required.
+
+==== Authentication & Sessions
+
+<procedure>(get-login-form/html #!optional (out (current-output-port)))</procedure> 
+
+Generate an HTML form for user login.
+
+
+<procedure>(webform-login FORM-DATA IP #!optional (out (current-output-port)))</procedure>
+
+Handler for user login via the HTML form. When the username and password are accepted,
+sets a session cookie in the browser.
+
+
+<procedure>(unauthorized-message/html REFERER #!optional (out (current-output-port)))</procedure>
+
+Generates a message informing the user that the action they attempted was unauthorized.
 
 
 ==== SQLite3 Backend
@@ -203,6 +216,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 
 === Version History
+
+;0.2:       Added user login and session support.
 
 ;0.1.3:     Switched password hashing to (crypt).
 
