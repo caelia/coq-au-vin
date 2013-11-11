@@ -12,7 +12,7 @@ Matt Gushee <matt@gushee.net>
 
 === Requirements
 
-[[utf8]], [[uri-common]], [[sql-de-lite]], [[civet]], [[lowdown]], [[crypt]]
+[[utf8]], [[uri-common]], [[sql-de-lite]], [[civet]], [[lowdown]], [[crypt]], [[random-bsd]]
 
 === Introduction
 
@@ -214,6 +214,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 
 === Version History
+
+;0.2.1:     Added missing dependency.
 
 ;0.2:       Added user login and session support.
 
