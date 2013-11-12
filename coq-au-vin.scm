@@ -560,7 +560,6 @@
     (string-split list-string ",")))
 
 (define (prepare-form-data form-data #!optional (update #f))
-  (log-obj "prepare-form-data" form-data)
   (let* ((verify-field
           (lambda (fname)
             (let ((val (alist-ref fname form-data)))
