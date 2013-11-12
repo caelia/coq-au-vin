@@ -215,6 +215,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 === Version History
 
+;0.2.2:     Removed a debugging command that caused errors.
+
 ;0.2.1:     Added missing dependency.
 
 ;0.2:       Added user login and session support.
