@@ -8,3 +8,5 @@ TODO List for Coq au Vin
 * Add and test add-article functionality.
 
 * Get rid of 'categories', create 'sections'?
+
+* Figure out why series title doesn't get updated.
