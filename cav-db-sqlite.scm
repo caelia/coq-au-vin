@@ -557,7 +557,7 @@ SQL
 (define update-article-query
 #<<SQL
 UPDATE articles
-SET title = ?, subtitle = ?, modified_dt = strftime('%s', 'now', 'localtime'), alias = ?, sticky = ?
+SET title = ?, series = ?, series_pt = ?, subtitle = ?, modified_dt = strftime('%s', 'now', 'localtime'), alias = ?, sticky = ?
 WHERE node_id = ?;
 SQL
 )
@@ -851,7 +851,7 @@ SQL
          (series-pt (or (and id+pn (cadr id+pn)) '()))
          (conn (current-connection))
          (st-art (sd:sql/transient conn update-article-query)))
-    (sd:exec st-art title subtitle alias sticky node-id)
+    (sd:exec st-art title series-id series-pt subtitle alias sticky node-id)
     (%update-article-authors node-id authors)
     (%update-article-tags node-id tags)
     (%update-article-categories node-id categories)
