@@ -16,6 +16,9 @@
         (use intarweb)
 
 
+(define %domain% (make-parameter #f))
+
+
 (define (log-obj msg obj #!optional (logfile "obj.log"))
   (with-output-to-file
     logfile
@@ -28,12 +31,12 @@
   (alist-ref key alist string=?))
 
 ;; deprecated!
-(define (put-session-key out key domain)
-  (out (sprintf "Set-Cookie: SessionKey=~A; Domain=~A; Secure; HttpOnly\r\n" key domain)))
+(define (put-session-key out key)
+  (out (sprintf "Set-Cookie: SessionKey=~A; Domain=~A; Secure; HttpOnly\r\n" key)))
 
-(define (set-session-key! hdrs key domain)
+(define (set-session-key hdrs key)
   (let ((cookie-header
-          (sprintf "Set-Cookie: SessionKey=~A; Domain=~A; Secure; HttpOnly\r\n" key domain)))
+          (sprintf "Set-Cookie: SessionKey=~A; Domain=~A; Secure; HttpOnly\r\n" key (%domain%))))
     (headers `((set-cookie . ,cookie-header)) hdrs)))
 
 (define (get-session-key env*)
@@ -65,6 +68,16 @@
      
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ------------------------------------------------------------------------
+
+(define (send-page out response body #!key (type "text/html") (session-key #f))
+  (let* ((hdrs** (response-headers response))
+         (hdrs* (headers `((content-type . ,type) (content-length . ,(string-length body)))) hdrs**)
+         (hdrs
+           (if session-key
+             (set-session-key hdrs* session-key)
+             hdrs*))
+         (resp (update-response response #! headers: hdrs)))
+
 
 (define (request-handler in out err env)
   (let* ((env* (env))
