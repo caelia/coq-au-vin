@@ -1,0 +1,43 @@
+Hi Matt,
+
+I thought I would check this out. I was curious and I did a lot of
+research into authentication and security stuff for awful/spiffy
+awhile back. I am by no means an expert but I learned a thing or two
+so I thought I'd take a look. I didn't perform any sort-of intense
+security audit but just a couple notes.
+
+I had a hard time trying to figure out where coq-au-vin ended and the
+fastcgi stuff started so forgive me if I missed something.
+
+A few notes:
+
+* a session cookie should be set as "http-only" to prevent a XSS
+attack from grabbing or modifying it.
+* a session cookie should be set as "secure" to make sure it is always
+encrypted which it may not be even when the page is loaded as https
+* to have a truly secure session all pages that use the session cookie
+should be https only not just the sign in pages otherwise the above
+points don't really matter and the session isn't really very secure in
+general.
+* tying the IP to the session will break things for some users,
+unfortunately. Users on some ISPs will have their IPs changed out from
+under them at random intervals. http-session allows you to enable or
+disable IP checking and in all of the large web apps I've done we've
+had to disable it for the aforementioned reason.
+* it is a good idea to set http strict-transport-security for all TLS
+pages. It will prevent some man-in-the-middle attacks.
+* using crypt is good. One thing to note though is that it depends on
+libs installed on the system to provide good protection and when you
+deploy things using crypt make sure you have bcrypt or similar
+installed before installing crypt so it can use bcrypt and not a
+weaker hashing function.
+
+Here is a mail thread for awful in which we discussed some of this:
+http://librelist.com/browser//awful/2013/4/15/awful-and-ssl/
+
+I found OWASP to be a great resource: https://owasp.org/index.php/Main_Page
+
+I'm curious, why not just use awful and related eggs? Awful handles a
+lot of what you've done for you. And why XML and not something like
+SXML? SXML is much less annoying and prevents things like not closing
+a tag.
