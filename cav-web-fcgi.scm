@@ -15,9 +15,13 @@
         (use utf8-srfi-13)
         (use intarweb)
 
+;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+;;; ------------------------------------------------------------------------
 
 (define %domain% (make-parameter #f))
 
+;;; ========================================================================
+;;; ------------------------------------------------------------------------
 
 (define (log-obj msg obj #!optional (logfile "obj.log"))
   (with-output-to-file
@@ -30,6 +34,13 @@
 (define (alist-stref key alist)
   (alist-ref key alist string=?))
 
+;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+
+
+
+;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+;;; ------------------------------------------------------------------------
+
 ;; deprecated!
 (define (put-session-key out key)
   (out (sprintf "Set-Cookie: SessionKey=~A; Domain=~A; Secure; HttpOnly\r\n" key)))
@@ -38,6 +49,12 @@
   (let ((cookie-header
           (sprintf "Set-Cookie: SessionKey=~A; Domain=~A; Secure; HttpOnly\r\n" key (%domain%))))
     (headers `((set-cookie . ,cookie-header)) hdrs)))
+
+(define (set-strict-tls hdrs #!optional (max-age 63072000) (include-subdomains #t))
+  (headers 
+    '((strict-transport-security . ((max-age . ,max-age)
+                                    (include-subdomains . ,include-subdomains))))
+     hdrs))
 
 (define (get-session-key env*)
   (let* ((cookie-string (alist-stref "HTTP_COOKIE" env*))
@@ -66,18 +83,37 @@
 ;         ...)
 ;       (unauthorized 
      
+;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+
+
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ------------------------------------------------------------------------
 
-(define (send-page out response body #!key (type "text/html") (session-key #f))
-  (let* ((hdrs** (response-headers response))
-         (hdrs* (headers `((content-type . ,type) (content-length . ,(string-length body)))) hdrs**)
+(define (send-page out response body #!key (type 'html) (session-key #f) (https #f))
+  (let* ((typestr
+           (case type
+             ((html) "text/html")
+             ((json) "application/json")))
+         (hdrs*
+           (headers
+             `((content-type . ,typestr) (content-length . ,(string-length body))))
+             (response-headers response))
          (hdrs
-           (if session-key
-             (set-session-key hdrs* session-key)
-             hdrs*))
-         (resp (update-response response #! headers: hdrs)))
-
+           (cond
+             (session-key
+               (set-strict-tls (set-session-key hdrs* session-key)))
+             (https
+               (set-strict-tls hdrs*))
+             (else
+               hdrs*)))
+         (resp* (update-response response headers: hdrs)))
+    (out
+      (with-output-to-string
+        (lambda ()
+          (let ((resp (update-response resp* port: (current-output-port))))
+            (write-response resp)
+            (display body)
+            (finish-response-body resp)))))))
 
 (define (request-handler in out err env)
   (let* ((env* (env))
@@ -181,6 +217,8 @@
 
 ) ; END MODULE
 
+;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+;;; ------------------------------------------------------------------------
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
 ;;; ========================================================================
