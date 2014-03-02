@@ -1,15 +1,20 @@
 ;;; cav-web-fcgi.scm -- FastCGI front end for Coq-au-Vin
 ;;;
-;;;   Copyright © 2013 by Matthew C. Gushee <matt@gushee.net>
+;;;   Copyright © 2013-2014 by Matthew C. Gushee <matt@gushee.net>
 ;;;   This program is open-source software, released under the
 ;;;   BSD license. See the accompanying LICENSE file for details.
 
-(use coq-au-vin)
-(use cav-db-sqlite)
-(use fastcgi)
-(use uri-common)
-(use matchable)
-(use utf8-srfi-13)
+(module cav-web-fcgi
+        *
+        (import scheme chicken)
+        (use coq-au-vin)
+        (use cav-db-sqlite)
+        (use fastcgi)
+        (use uri-common)
+        (use matchable)
+        (use utf8-srfi-13)
+        (use intarweb)
+
 
 (define (log-obj msg obj #!optional (logfile "obj.log"))
   (with-output-to-file
@@ -22,8 +27,14 @@
 (define (alist-stref key alist)
   (alist-ref key alist string=?))
 
-(define (put-session-key out key)
-  (out (sprintf "Set-Cookie: SessionKey=~A\r\n" key)))
+;; deprecated!
+(define (put-session-key out key domain)
+  (out (sprintf "Set-Cookie: SessionKey=~A; Domain=~A; Secure; HttpOnly\r\n" key domain)))
+
+(define (set-session-key! hdrs key domain)
+  (let ((cookie-header
+          (sprintf "Set-Cookie: SessionKey=~A; Domain=~A; Secure; HttpOnly\r\n" key domain)))
+    (headers `((set-cookie . ,cookie-header)) hdrs)))
 
 (define (get-session-key env*)
   (let* ((cookie-string (alist-stref "HTTP_COOKIE" env*))
@@ -153,6 +164,9 @@
 
 (define (run listen-port)
   (fcgi-accept-loop listen-port 0 request-handler))
+
+
+) ; END MODULE
 
 ;;; OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 
