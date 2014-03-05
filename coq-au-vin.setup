@@ -4,12 +4,11 @@
 (compile -O -s coq-au-vin.import.scm)
 (compile -O -s cav-db-sqlite.scm -j cav-db-sqlite)
 (compile -O -s cav-db-sqlite.import.scm)
-;(compile -O -s cav-web-fcgi.scm -j cav-web-fcgi)
-;(compile -O -s cav-web-fcgi.import.scm)
+(compile -O -s cav-web-fcgi.scm -j cav-web-fcgi)
+(compile -O -s cav-web-fcgi.import.scm)
 (install-extension
   'coq-au-vin
   '("cav-db.so" "cav-db.import.so" "coq-au-vin.so" "coq-au-vin.import.so"
-    "cav-db-sqlite.so" "cav-db-sqlite.import.so"; "cav-web-fcgi.so"
-    ;"cav-web-fcgi.import.so")
-    )
-  '((version "0.2.3")))
+    "cav-db-sqlite.so" "cav-db-sqlite.import.so" "cav-web-fcgi.so"
+    "cav-web-fcgi.import.so")
+  '((version "0.3")))
