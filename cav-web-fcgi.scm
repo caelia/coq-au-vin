@@ -146,7 +146,7 @@
       (match spec
         [(or ((/ "") "GET" #f) ((/ "articles") "GET" #f))
          (send-html (get-article-list-page/html out: #f))]
-        [(or ((/ "") "GET" #f) ((/ "articles") "GET" ofs))
+        [(or ((/ "") "GET" ofs) ((/ "articles") "GET" ofs))
          (send-html (get-article-list-page/html out: #f offset: (string->number ofs)))]
         [((/ "articles" "new") "GET" _)
          (when-authorized 'create-article
