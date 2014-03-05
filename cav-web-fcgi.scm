@@ -144,9 +144,9 @@
       exn
       (err (with-output-to-string (lambda () (pp exn))))
       (match spec
-        [(or ((/ "") "GET" #f) ((/ "articles") "GET" #f))
+        [((or (/ "") (/ "articles")) "GET" #f)
          (send-html (get-article-list-page/html out: #f))]
-        [(or ((/ "") "GET" ofs) ((/ "articles") "GET" ofs))
+        [((or (/ "") (/ "articles")) "GET" ofs)
          (send-html (get-article-list-page/html out: #f offset: (string->number ofs)))]
         [((/ "articles" "new") "GET" _)
          (when-authorized 'create-article
