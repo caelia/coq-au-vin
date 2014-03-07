@@ -23,6 +23,9 @@
 
 (define %domain% (make-parameter #f))
 
+; For testing only!
+(define %disable-https% (make-parameter #f))
+
 ;;; ========================================================================
 ;;; ------------------------------------------------------------------------
 
@@ -45,14 +48,25 @@
 ;;; ------------------------------------------------------------------------
 
 (define (set-session-key hdrs key)
-  (let ((cookie-header
-          (sprintf "SessionKey=~A; Domain=~A; Secure; HttpOnly\r\n" key (%domain%))))
-    (headers `((set-cookie . ,cookie-header)) hdrs)))
+  (let* ((params**
+           '((http-only . #t)))
+         (params*
+           (if (%disable-https%)
+             params**
+             `((secure . #t) ,@params**)))
+         (domain (%domain%))
+         (params
+           (if domain
+             `((domain . ,domain) ,@params*)
+             params*)))
+  (headers
+    `((set-cookie #(("SessionKey" . ,key) ,params)))
+    hdrs)))
 
 (define (set-strict-tls hdrs #!optional (max-age 63072000) (include-subdomains #t))
   (headers 
-    '((strict-transport-security . ((max-age . ,max-age)
-                                    (include-subdomains . ,include-subdomains))))
+    `((strict-transport-security ((max-age . ,max-age)
+                                  (includesubdomains . ,include-subdomains))))
      hdrs))
 
 (define (get-session-key env*)
@@ -89,13 +103,13 @@
 ;;; ------------------------------------------------------------------------
 
 (define (send-page out response body #!key (type 'html) (session-key #f) (https #f) (extra-headers '()))
-  (let* ((typestr
+  (let* ((ctype
            (case type
-             ((html) "text/html")
-             ((json) "application/json")))
+             ((html) '("text/html"))
+             ((json) '("application/json"))))
          (hdrs*
            (headers
-             `((content-type . ,typestr) (content-length . ,(string-length body)) ,@extra-headers)
+             `((content-type . ,ctype) (content-length . (,(string-length body))) ,@extra-headers)
              (response-headers response)))
          (hdrs
            (cond
@@ -137,7 +151,7 @@
                    (referer (or (alist-stref "HTTP_REFERER" env*) "/"))
                    (session-key (get-session-key env*)))
                (cond
-                 ((and https? (authorized? session-key action-key client-ip)) (action))
+                 ((and (or https? (%disable-https%)) (authorized? session-key action-key client-ip)) (action))
                  ((eqv? type 'html) (send-html (unauthorized-message/html referer #f)))
                  ((eqv? type 'json) (send-json (unauthorized-message/json referer #f))))))))
     (handle-exceptions
@@ -191,24 +205,36 @@
         [((/ "categories" category) "GET" ofs)
          (send-html (get-article-list-page/html criterion: `(category ,category) out: #f offset: (string->number ofs)))]
         [((/ "login") "GET" _)
-         (send-html (get-login-form/html #f) #t)]
+         (send-html (get-login-form/html #f) (not (%disable-https%)))]
         [((/ "login") "POST" _)
          (let* ((raw-form (fcgi-get-post-data in env))
                 (form-data (form-urldecode raw-form))
                 (client-ip (alist-stref "REMOTE_ADDR" env*)))
            (let-values (((page session) (webform-login form-data client-ip #f)))
              (cond
-               ((and session https?)
+               ((and session (or https? (%disable-https%)))
                 (send-page out (make-response) page session-key: session https: #t))
-               (https? (send-html page))
-               (else (out (with-output-to-string (lambda () (write-response (make-response status: 'forbidden)))))))))]
+               ((or https? (%disable-https%))
+                 (send-html page))
+               (else
+                 (out
+                   (with-output-to-string
+                     (lambda ()
+                       (write-response
+                         (make-response status: 'forbidden port: (current-output-port))))))))))]
+        [((/ "logout") _ _)
+         (let ((key (get-session-key env*)))
+           (when key (logout session: key)))]
         [_
           (out
             (with-output-to-string
               (lambda ()
-                (write-response (make-response status: 'not-found)))))]))))
+                (write-response
+                  (make-response status: 'not-found port: (current-output-port))))))]))))
 
-(define (run listen-port)
+(define (run listen-port #!optional (testing #f))
+  (when testing
+    (%disable-https% #t))
   (fcgi-accept-loop listen-port 0 request-handler))
 
 
