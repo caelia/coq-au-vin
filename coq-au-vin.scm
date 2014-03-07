@@ -608,7 +608,7 @@
   #f)
 
 (define (get-article-page/html id/alias #!key (out (current-output-port))
-                               (date-format #f))
+                               (date-format #f) (logged-in #f))
   ((db:connect))
   (let* ((article-data (get-article-data id/alias))
          ; (html-body (process-body article-data))
@@ -617,7 +617,7 @@
            (config-get
              'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
              'copyright_holders 'rights_statement 'html_title 'body_classes))
-         (vars `((article_id . ,id/alias) ,@page-vars ,@vars*))
+         (vars `((article_id . ,id/alias) (logged_in . ,logged-in) ,@page-vars ,@vars*))
          (ctx (cvt:make-context vars: vars)))
     ((db:disconnect))
     (cvt:render "article.html" ctx port: out)))
@@ -625,7 +625,7 @@
 (define (get-article-list-page/html #!key (out (current-output-port))
                                     (criterion 'all) (sort '(created desc))
                                     (date-format #f) (limit 10) (offset 0)
-                                    (show 'teaser))
+                                    (show 'teaser) (logged-in #f))
   ((db:connect))
   (let ((mkteaser
           (case show
@@ -661,38 +661,40 @@
                  'copyright_holders 'rights_statement 'html_title 'body_classes))
              (vars
                `((self_base_url . ,self-base-url) (simple_pager ,@simple-pager)
-                 (articles ,@list-vars) ,@page-vars))
+                 (articles ,@list-vars) (logged_in . ,logged-in) ,@page-vars))
              (ctx (cvt:make-context vars: vars)))
         ((db:disconnect))
         (cvt:render "article-list.html" ctx port: out)))))
 
 (define (get-articles-by-date/html date #!key (out (current-output-port))
                                    (sort '(created desc)) (limit 10)
-                                   (offset 0) (show 'teaser))
+                                   (offset 0) (show 'teaser) (logged-in #f))
   #f)
 
-(define (get-meta-list-page/html subject #!optional (out (current-output-port)))
+(define (get-meta-list-page/html subject #!key (out (current-output-port)) (logged-in #f))
   ((db:connect))
   (let* ((list-data ((db:get-meta-list) subject))
          (page-vars
            (config-get
              'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
              'copyright_holders 'rights_statement 'html_title 'body_classes))
-         (vars `((subject . ,(symbol->string subject)) (metadata_items . ,list-data) ,@page-vars))
+         (vars `((subject . ,(symbol->string subject)) (metadata_items . ,list-data)
+                 (logged_in . ,logged-in) ,@page-vars))
          (ctx (cvt:make-context vars: vars)))
     ((db:disconnect))
     (cvt:render "meta-list.html" ctx port: out)))
 
 (define (get-article-list/json #!optional (out (current-output-port))
                                #!key (filters 'latest) (sort '(created desc))
-                               (per-page 10) (show 'teaser))
+                               (per-page 10) (show 'teaser) (logged-in #f))
   #f)
 
 (define (get-new-article-form/html #!optional (out (current-output-port)))
-  (let* ((vars
+  (let* ((page-vars
            (config-get
              'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
              'copyright_holders 'rights_statement 'html_title 'body_classes))
+         (vars `((logged_in . #t) ,@page-vars))
          (ctx (cvt:make-context vars: vars)))
     (cvt:render "edit.html" ctx port: out)))
 
@@ -705,7 +707,7 @@
            (config-get
              'url_scheme 'host_name 'body_md 'jquery_src 'can_edit 'copyright_year
              'copyright_holders 'rights_statement 'html_title 'body_classes))
-         (vars `((article_id . ,id/alias) ,@page-vars ,@vars*))
+         (vars `((article_id . ,id/alias) (logged_in . #t) ,@page-vars ,@vars*))
          (ctx (cvt:make-context vars: vars)))
     ((db:disconnect))
     (cvt:render "edit.html" ctx port: out)))
@@ -722,7 +724,7 @@
                    (data+ (cons node-id (map cdr data))))
               (apply (db:create-article) data+)
               `((message . "Article successfully posted.") (msg_class . "info")
-                (proceed_to . "/articles") ,@page-vars))))
+                (proceed_to . "/articles") (logged_in . #t) ,@page-vars))))
       ((db:disconnect))
       (cvt:render "msg.html" (cvt:make-context vars: vars) port: out))))
 
@@ -777,7 +779,8 @@
             'copyright_holders 'rights_statement 'html_title 'body_classes))
          (vars
            `((message . "You are not authorized to perform this action.")
-             (msg_class . "error") (proceed_to . ,referer) ,@page-vars)))
+             (msg_class . "error") (logged_in . #t) (proceed_to . ,referer)
+             ,@page-vars)))
     (cvt:render "msg.html" (cvt:make-context vars: vars) port: out)))
 
 (define (unauthorized-message/json referer #!optional (out (current-output-port)))

@@ -145,11 +145,12 @@
          (send-json
            (lambda (data #!optional (require-https #f) (extra-headers '()))
              (send-page out (make-response) data type: 'json https: (or require-https https?) extra-headers: extra-headers)))
+         (session-key (get-session-key env*))
+         (logged-in (and session-key #t))
          (when-authorized
            (lambda (action-key action #!optional (type 'html))
              (let ((client-ip (alist-stref "REMOTE_ADDR" env*))
-                   (referer (or (alist-stref "HTTP_REFERER" env*) "/"))
-                   (session-key (get-session-key env*)))
+                   (referer (or (alist-stref "HTTP_REFERER" env*) "/")))
                (cond
                  ((and (or https? (%disable-https%)) (authorized? session-key action-key client-ip)) (action))
                  ((eqv? type 'html) (send-html (unauthorized-message/html referer #f)))
@@ -159,9 +160,9 @@
       (err (with-output-to-string (lambda () (pp exn))))
       (match spec
         [((or (/ "") (/ "articles")) "GET" #f)
-         (send-html (get-article-list-page/html out: #f))]
+         (send-html (get-article-list-page/html out: #f logged-in: logged-in))]
         [((or (/ "") (/ "articles")) "GET" ofs)
-         (send-html (get-article-list-page/html out: #f offset: (string->number ofs)))]
+         (send-html (get-article-list-page/html out: #f offset: (string->number ofs) logged-in: logged-in))]
         [((/ "articles" "new") "GET" _)
          (when-authorized 'create-article
                           (lambda () (send-html (get-new-article-form/html #f))))]
@@ -179,31 +180,38 @@
          (when-authorized 'edit-article
                           (lambda () (send-html (get-article-edit-form/html id/alias #f))))]
         [((/ "articles" id/alias) "GET" _)
-         (send-html (get-article-page/html id/alias out: #f))]
+         (send-html (get-article-page/html id/alias out: #f logged-in: logged-in))]
         [((or (/ "series") (/ "series" "")) "GET" _)
-         (send-html (get-meta-list-page/html 'series #f))]
+         (send-html (get-meta-list-page/html 'series out: #f logged-in: logged-in))]
         [((/ "series" series-title) "GET" #f)
-         (send-html (get-article-list-page/html criterion: `(series ,series-title) out: #f))]
+         (send-html (get-article-list-page/html criterion: `(series ,series-title)
+                                                out: #f logged-in: logged-in))]
         [((/ "series" series-title) "GET" ofs)
-         (send-html (get-article-list-page/html criterion: `(series ,series-title) out: #f offset: (string->number ofs)))]
+         (send-html (get-article-list-page/html criterion: `(series ,series-title) out: #f
+                                                offset: (string->number ofs) logged-in: logged-in))]
         [((or (/ "tags") (/ "tags" "")) "GET" _)
-         (send-html (get-meta-list-page/html 'tags #f))]
+         (send-html (get-meta-list-page/html 'tags out: #f logged-in: logged-in))]
         [((/ "tags" tag) "GET" #f)
-         (send-html (get-article-list-page/html criterion: `(tag ,tag) out: #f))]
+         (send-html (get-article-list-page/html criterion: `(tag ,tag) out: #f logged-in: logged-in))]
         [((/ "tags" tag) "GET" ofs)
-         (send-html (get-article-list-page/html criterion: `(tag ,tag) out: #f offset: (string->number ofs)))]
+         (send-html (get-article-list-page/html criterion: `(tag ,tag) out: #f
+                                                offset: (string->number ofs) logged-in: logged-in))]
         [((or (/ "authors") (/ "authors" "")) "GET" _)
-         (send-html (get-meta-list-page/html 'authors #f))]
+         (send-html (get-meta-list-page/html 'authors out: #f logged-in: logged-in))]
         [((/ "authors" author) "GET" #f)
-         (send-html (get-article-list-page/html criterion: `(author ,author) out: #f))]
+         (send-html (get-article-list-page/html criterion: `(author ,author)
+                                                out: #f logged-in: logged-in))]
         [((/ "authors" author) "GET" ofs)
-         (send-html (get-article-list-page/html criterion: `(author ,author) out: #f offset: (string->number ofs)))]
+         (send-html (get-article-list-page/html criterion: `(author ,author) out: #f
+                                                offset: (string->number ofs) logged-in: logged-in))]
         [((or (/ "categories") (/ "categories" "")) "GET" _)
-         (send-html (get-meta-list-page/html 'categories #f))]
+         (send-html (get-meta-list-page/html 'categories out: #f logged-in: logged-in))]
         [((/ "categories" category) "GET" #f)
-         (send-html (get-article-list-page/html criterion: `(category ,category) out: #f))]
+         (send-html (get-article-list-page/html criterion: `(category ,category)
+                                                out: #f logged-in: logged-in))]
         [((/ "categories" category) "GET" ofs)
-         (send-html (get-article-list-page/html criterion: `(category ,category) out: #f offset: (string->number ofs)))]
+         (send-html (get-article-list-page/html criterion: `(category ,category) out: #f
+                                                offset: (string->number ofs) logged-in: logged-in))]
         [((/ "login") "GET" _)
          (send-html (get-login-form/html #f) (not (%disable-https%)))]
         [((/ "login") "POST" _)
@@ -223,8 +231,8 @@
                        (write-response
                          (make-response status: 'forbidden port: (current-output-port))))))))))]
         [((/ "logout") _ _)
-         (let ((key (get-session-key env*)))
-           (when key (logout session: key)))]
+          (when session-key
+            (logout session: session-key))]
         [_
           (out
             (with-output-to-string
