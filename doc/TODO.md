@@ -1,12 +1,24 @@
 TODO List for Coq au Vin
 ========================
 
-* Add pager functionality to enable long list navigation.
-
 * Add calendar widget.
-
-* Add and test add-article functionality.
 
 * Get rid of 'categories', create 'sections'?
 
-* Figure out why series title doesn't get updated.
+* Develop AJAX api.
+
+* Rearchitect for clear layering of functionality.
+
+* Create Spiffy interface.
+
+* Add comment capability.
+
+* Add git versioning support.
+
+* Create combo page.
+
+* Developing inline editing.
+
+* Implement SHOW & SORT for article lists.
+
+* Implement article aliases.

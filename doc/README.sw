@@ -12,7 +12,8 @@ Matt Gushee <matt@gushee.net>
 
 === Requirements
 
-[[utf8]], [[uri-common]], [[sql-de-lite]], [[civet]], [[lowdown]], [[crypt]], [[random-bsd]]
+[[utf8]], [[uri-common]], [[sql-de-lite]], [[civet]], [[lowdown]], [[crypt]],
+    [[random-bsd]], [[intarweb]], [[matchable]], [[fastcgi]]
 
 === Introduction
 
@@ -25,10 +26,13 @@ It uses [[civet]] to generate dynamic pages, and has an abstract database layer 
 allows for different databases to be used. There is currently a SQLite3 backend 
 included in this egg. Additional databases will be supported in separate eggs.
 
-The body text of articles should be written in Markdown syntax.
+Blog posts are processed as Markdown, using the [[lowdown]] egg.
 
-Please note that the current release does not implement any form of HTTP request
-handling. However, there is an
+The current version supports request handing via FastCGI. Future versions will also
+support [[spiffy]]. All secured content must be accessed via HTTPS, though this
+constraint may be disabled for testing purposes.
+
+For more detailed information, you may wish to look at the
 [[https://github.com/mgushee/coq-au-vin-examples|examples collection]], which 
 includes several toy examples and one real web application.
 
@@ -40,6 +44,10 @@ Expect bugs.
 
 
 === Scheme API
+
+Please note that this document does not cover all symbols exported by the egg. However,
+those that are not documented should be considered experimental and [more] likely to
+change.
 
 ==== Initialization & Configuration
 
@@ -86,22 +94,40 @@ Returns an alist of all defined variables.
 
 ==== Content API
 
-<procedure>(get-article-page/html ID/ALIAS #!key (out (current-output-port)) (date-format #f))</procedure>
+===== Common Parameters
 
-Generate an HTML page that displays the full text of one article. ID/ALIAS may be
-either the article's node id or its alias, if defined.
+Many of the procedures below take the following parameters:
+
+* {{ID/ALIAS}}  The identifier for a blog post. ID is a system-generated value; ALIAS is an
+    optional string that may be specified by the user to allow for "friendly" URLs [not yet
+    implemented as of version 0.3].
+
+* {{OUT}}  An output port, defaulting to {{(current-output-port)}}. If you change this,
+    expect problems.
+
+* {{LOGGED-IN}}  A boolean indicating whether the user is logged in or not. Note that this
+    parameter is ''not'' used to grant or deny access to secured resources; it is intended as
+    a convenient way to determine whether to display certain page items related to the user's
+    logged-in status (e.g. a "LOGIN" or "LOGOUT" link).
 
 
-<procedure>(get-article-list-page/html #!key (out (current-output-port)) (criterion 'all) (sort '(created desc))
-                                             (date-format #f) (limit 10) (offset 0) (show 'teaser))</procedure>
+<procedure>(get-article-page/html ID/ALIAS #!key (out (current-output-port)) (date-format #f)
+                                                 (logged-in #f))</procedure>
+
+Generate an HTML page that displays the full text of one article.
+
+
+<procedure>(get-article-list-page/html #!key (out (current-output-port)) (criterion 'all)
+                                             (sort '(created desc)) (date-format #f) (limit 10)
+                                             (offset 0) (show 'teaser) (logged-in #f))</procedure>
 
 Generate an HTML page displaying a list of articles. The list may be filtered using the
 CRITERION argument; currently supported values are {{'all}}, {{'(tag TAG)}}, {{'(author AUTHOR)}},
-{{'(series SERIES-TITLE)}}, {{'(category CATEGORY)}}. As of version 0.1, the SHOW and SORT arguments
+{{'(series SERIES-TITLE)}}, {{'(category CATEGORY)}}. As of version 0.3, the SHOW and SORT arguments
 are unimplemented.
 
 
-<procedure>(get-meta-list-page/html SUBJECT #!optional (out (current-output-port)))</procedure>
+<procedure>(get-meta-list-page/html SUBJECT #!optional (out (current-output-port)) (logged-in #f))</procedure>
 
 Generate an HTML page listing all items of a particular type. SUBJECT must be one of {{'tags}},
 {{'categories}}, {{'series}}, or {{'authors}}.
@@ -114,7 +140,7 @@ Generate an HTML form for creating a new article.
 
 <procedure>(get-article-edit-form/html ID/ALIAS #!optional (out (current-output-port)))</procedure>
 
-Generate an HTML form for editing an existing article, specified by ID/ALIAS.
+Generate an HTML form for editing an existing article.
 
 
 <procedure>(add-article FORM-DATA #!optional (out (current-output-port)))</procedure>
@@ -166,6 +192,14 @@ database file, which should be the same file as specified in {{setup-db}}. CONTE
 is a directory where article content files will be stored.
 
 
+==== FastCGI Interface
+
+<procedure>(run LISTEN-PORT #!optional (testing #f))</procedure>
+
+Runs the FastCGI server on LISTEN-PORT, which may be either a TCP port (integer) or a
+unix socket (string). See the [[fastcgi]] documentation for more information. The TESTING
+parameter disables the HTTPS-only requirement for secured resources. 
+
 === In case of bugs
 
 If you have a GitHub account, please use the 
@@ -177,7 +211,7 @@ list will also work.
 
 === License
 
-Copyright (c) 2013, Matthew C. Gushee
+Copyright (c) 2013-2014, Matthew C. Gushee
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -214,6 +248,10 @@ POSSIBILITY OF SUCH DAMAGE.
 
 
 === Version History
+
+;0.3:       Integrated FastCGI support; modified HTTP response generation to use
+            [[intarweb]]; improved security by enforcing strict TLS and making
+            session cookies 'Secure' and 'HttpOnly'.
 
 ;0.2.3:     Fixed bug that prevented series title from being updated.
 
