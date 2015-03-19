@@ -13,11 +13,11 @@
         (import scheme chicken)
         (import extras)
         (import files)
-        (import utils)
         (import ports)
         (import posix)
         (import data-structures)
 
+        (use utils)
         (use utf8)
         (use utf8-srfi-13)
         (use (prefix sql-de-lite sd:))
