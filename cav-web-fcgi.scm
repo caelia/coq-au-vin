@@ -155,9 +155,9 @@
                  ((and (or https? (%disable-https%)) (authorized? session-key action-key client-ip)) (action))
                  ((eqv? type 'html) (send-html (unauthorized-message/html referer #f)))
                  ((eqv? type 'json) (send-json (unauthorized-message/json referer #f))))))))
-    (handle-exceptions
-      exn
-      (err (with-output-to-string (lambda () (pp exn))))
+    ;(handle-exceptions
+      ;exn
+      ;(err (with-output-to-string (lambda () (pp exn))))
       (match spec
         [((or (/ "") (/ "articles")) "GET" #f)
          (send-html (get-article-list-page/html out: #f logged-in: logged-in))]
@@ -238,7 +238,8 @@
             (with-output-to-string
               (lambda ()
                 (write-response
-                  (make-response status: 'not-found port: (current-output-port))))))]))))
+                  (make-response status: 'not-found port: (current-output-port))))))])))
+  ;)
 
 (define (run listen-port #!optional (testing #f))
   (when testing
