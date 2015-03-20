@@ -11,4 +11,4 @@
   '("cav-db.so" "cav-db.import.so" "coq-au-vin.so" "coq-au-vin.import.so"
     "cav-db-sqlite.so" "cav-db-sqlite.import.so" "cav-web-fcgi.so"
     "cav-web-fcgi.import.so")
-  '((version "0.3")))
+  '((version "0.3.1")))

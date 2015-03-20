@@ -249,6 +249,9 @@ POSSIBILITY OF SUCH DAMAGE.
 
 === Version History
 
+;0.3.1:     Fixed 'logged-in' function; removed IP address checking for session-valid?;
+            added JSON combo menu handler.
+ 
 ;0.3:       Integrated FastCGI support; modified HTTP response generation to use
             [[intarweb]]; improved security by enforcing strict TLS and making
             session cookies 'Secure' and 'HttpOnly'.
