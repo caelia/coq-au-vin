@@ -63,6 +63,11 @@
 ;;; IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 ;;; ----  UTILITY FUNCTIONS  -----------------------------------------------
 
+(define (dump-sessions)
+  (hash-table-for-each
+    session-store
+    (lambda (k v) (printf "~A: ~A\n" k v))))
+
 (define (eprintf fmt . args)
   (error (apply sprintf (cons fmt args))))
 
@@ -349,6 +354,9 @@
     (if expired
       (not (delete-session! key))
       #f)))
+
+(define (session-exists? key)
+  (hash-table-ref/default session-store key #f))
 
 (define (session-valid? key session ip)
   (and key

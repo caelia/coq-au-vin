@@ -146,7 +146,10 @@
            (lambda (data #!optional (require-https #f) (extra-headers '()))
              (send-page out (make-response) data type: 'json https: (or require-https https?) extra-headers: extra-headers)))
          (session-key (get-session-key env*))
-         (logged-in (and session-key #t))
+         (logged-in (and session-key
+                         (let ((sdata (session-exists? session-key)))
+                           (and sdata
+                                (not (session-expired? session-key sdata))))))
          (when-authorized
            (lambda (action-key action #!optional (type 'html))
              (let ((client-ip (alist-stref "REMOTE_ADDR" env*))
@@ -232,7 +235,14 @@
                          (make-response status: 'forbidden port: (current-output-port))))))))))]
         [((/ "logout") _ _)
           (when session-key
-            (logout session: session-key))]
+            (logout session: session-key))
+          (out
+            (with-output-to-string
+              (lambda ()
+                (write-response
+                  (make-response port: (current-output-port)
+                                 status: 'see-other
+                                 headers: (headers `((location . (,(uri-reference "/"))))))))))]
         [_
           (out
             (with-output-to-string
