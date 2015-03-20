@@ -141,10 +141,19 @@
          (spec (list path method offset))
          (send-html
            (lambda (data #!optional (require-https #f) (extra-headers '()))
-             (send-page out (make-response) data https: (or require-https https?) extra-headers: extra-headers)))
+             (send-page out
+                        (make-response)
+                        data
+                        https: (or require-https https?)
+                        extra-headers: extra-headers)))
          (send-json
            (lambda (data #!optional (require-https #f) (extra-headers '()))
-             (send-page out (make-response) data type: 'json https: (or require-https https?) extra-headers: extra-headers)))
+             (send-page out
+                        (make-response)
+                        data
+                        type: 'json
+                        https: (or require-https https?)
+                        extra-headers: extra-headers)))
          (session-key (get-session-key env*))
          (logged-in (and session-key
                          (let ((sdata (session-exists? session-key)))
@@ -152,20 +161,25 @@
                                 (not (session-expired? session-key sdata))))))
          (when-authorized
            (lambda (action-key action #!optional (type 'html))
-             (let ((client-ip (alist-stref "REMOTE_ADDR" env*))
-                   (referer (or (alist-stref "HTTP_REFERER" env*) "/")))
+             (let ((referer (or (alist-stref "HTTP_REFERER" env*) "/")))
                (cond
-                 ((and (or https? (%disable-https%)) (authorized? session-key action-key client-ip)) (action))
+                 ((and (or https? (%disable-https%)) (authorized? session-key action-key)) (action))
                  ((eqv? type 'html) (send-html (unauthorized-message/html referer #f)))
-                 ((eqv? type 'json) (send-json (unauthorized-message/json referer #f))))))))
-    ;(handle-exceptions
-      ;exn
-      ;(err (with-output-to-string (lambda () (pp exn))))
+                 ((eqv? type 'json) (send-json (unauthorized-message/json referer #f)))))))
+         (can-post? (authorized? session-key 'create-article)))
+    (handle-exceptions
+      exn
+      (err (with-output-to-string (lambda () (pp exn))))
       (match spec
         [((or (/ "") (/ "articles")) "GET" #f)
-         (send-html (get-article-list-page/html out: #f logged-in: logged-in))]
+         (send-html (get-article-list-page/html out: #f
+                                                logged-in: logged-in
+                                                can-post?: can-post?))]
         [((or (/ "") (/ "articles")) "GET" ofs)
-         (send-html (get-article-list-page/html out: #f offset: (string->number ofs) logged-in: logged-in))]
+         (send-html (get-article-list-page/html out: #f
+                                                offset: (string->number ofs)
+                                                logged-in: logged-in
+                                                can-post?: can-post?))]
         [((/ "articles" "new") "GET" _)
          (when-authorized 'create-article
                           (lambda () (send-html (get-new-article-form/html #f))))]
@@ -215,6 +229,9 @@
         [((/ "categories" category) "GET" ofs)
          (send-html (get-article-list-page/html criterion: `(category ,category) out: #f
                                                 offset: (string->number ofs) logged-in: logged-in))]
+        ;; Temporary until we figure out the real structure
+        [((/ "combo-menu") "GET" _)
+         (send-json (get-combo-menu/json #f))]
         [((/ "login") "GET" _)
          (send-html (get-login-form/html #f) (not (%disable-https%)))]
         [((/ "login") "POST" _)
@@ -248,8 +265,7 @@
             (with-output-to-string
               (lambda ()
                 (write-response
-                  (make-response status: 'not-found port: (current-output-port))))))])))
-  ;)
+                  (make-response status: 'not-found port: (current-output-port))))))]))))
 
 (define (run listen-port #!optional (testing #f))
   (when testing

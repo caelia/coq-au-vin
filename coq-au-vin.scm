@@ -18,6 +18,7 @@
         (use (prefix civet cvt:))
   
         (use lowdown)
+        (use srfi-13)
         (use srfi-69)
         (use random-bsd)
         (use crypt)
@@ -358,11 +359,12 @@
 (define (session-exists? key)
   (hash-table-ref/default session-store key #f))
 
-(define (session-valid? key session ip)
+(define (session-valid? key session #!optional (ip #f))
   (and key
        session
        (not (session-expired? key session))
-       (string=? (session-ip session) ip)))
+       (or (not ip)
+           (string=? (session-ip session) ip))))
 
 (define (session-refresh! session new-exp)
   (session-expires-set! session new-exp))
@@ -382,12 +384,12 @@
              (delete-session! key)
              key)))))
 
-(define (authorized? session-key action ip #!optional (resource #f))
+(define (authorized? session-key action #!optional (resource #f))
   (or (eqv? action 'view-content)
       (and session-key
            (let ((session
                    (hash-table-ref/default session-store session-key #f)))
-             (and (session-valid? session-key session ip)
+             (and (session-valid? session-key session)
                   (let ((role (string->symbol (session-role session))))
                     (cond
                       ((eqv? role 'admin) #t)
@@ -690,6 +692,39 @@
          (ctx (cvt:make-context vars: vars)))
     ((db:disconnect))
     (cvt:render "meta-list.html" ctx port: out)))
+
+(define (meta-list->json metalist)
+  (let ((prop->string
+          (lambda (prop)
+            (string-append "\"" (symbol->string (car prop)) "\": \"" (cdr prop) "\""))))
+  (string-append
+    "["
+    (string-join
+      (map
+        (lambda (obj)
+          (string-append
+            "{"
+            (string-join
+              (map prop->string obj)
+              ", ")
+            "}"
+            ))
+        metalist)
+      ", ")
+    "]")))
+
+(define (get-combo-menu/json #!optional (out (current-output-port)))
+  ((db:connect))
+  (let ((json
+          (string-append
+            "{\"Categories\": " (meta-list->json ((db:get-meta-list) 'categories)) ", "
+             "\"Series\": " (meta-list->json ((db:get-meta-list) 'series)) ", "
+             "\"Authors\": " (meta-list->json ((db:get-meta-list) 'authors)) ", "
+             "\"Tags\": " (meta-list->json ((db:get-meta-list) 'tags)) "}")))
+    ((db:disconnect))
+    (if out
+      (display json out)
+      json)))
 
 (define (get-article-list/json #!optional (out (current-output-port))
                                #!key (filters 'latest) (sort '(created desc))
