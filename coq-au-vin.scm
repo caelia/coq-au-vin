@@ -386,8 +386,7 @@
   (or (eqv? action 'view-content)
       (and session-key
            (let ((session
-                   (and (hash-table-exists? session-store session-key)
-                        (hash-table-ref session-store session-key))))
+                   (hash-table-ref/default session-store session-key #f))))
              (and (session-valid? session-key session ip)
                   (let ((role (string->symbol (session-role session))))
                     (cond
