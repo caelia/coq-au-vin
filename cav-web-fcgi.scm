@@ -167,9 +167,9 @@
                  ((eqv? type 'html) (send-html (unauthorized-message/html referer #f)))
                  ((eqv? type 'json) (send-json (unauthorized-message/json referer #f)))))))
          (can-post? (authorized? session-key 'create-article)))
-    ;(handle-exceptions
-      ;exn
-      ;(err (with-output-to-string (lambda () (pp exn))))
+    (handle-exceptions
+      exn
+      (err (with-output-to-string (lambda () (pp exn))))
       (match spec
         [((or (/ "") (/ "articles")) "GET" #f)
          (send-html (get-article-list-page/html out: #f
@@ -231,10 +231,7 @@
                                                 offset: (string->number ofs) logged-in: logged-in))]
         ;; Temporary until we figure out the real structure
         [((/ "combo-menu") "GET" _)
-         ;(send-json (get-combo-menu/json #f))]
-         (let ((json (get-combo-menu/json #f)))
-           (log-obj "JSON: " json) 
-           (send-json json))]
+         (send-json (get-combo-menu/json #f))]
         [((/ "login") "GET" _)
          (send-html (get-login-form/html #f) (not (%disable-https%)))]
         [((/ "login") "POST" _)
@@ -268,8 +265,7 @@
             (with-output-to-string
               (lambda ()
                 (write-response
-                  (make-response status: 'not-found port: (current-output-port))))))])))
-  ;)
+                  (make-response status: 'not-found port: (current-output-port))))))]))))
 
 (define (run listen-port #!optional (testing #f))
   (when testing
