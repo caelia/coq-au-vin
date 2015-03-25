@@ -15,7 +15,7 @@ TODO List for Coq au Vin
 
 * Add git versioning support.
 
-* Create combo page.
+* Create combo page [JSON combo menu done - do we need an HTML version?]
 
 * Developing inline editing.
 
