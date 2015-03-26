@@ -717,10 +717,10 @@
   ((db:connect))
   (let ((json
           (string-append
-            "{\"Categories\": " (meta-list->json ((db:get-meta-list) 'categories)) ", "
-             "\"Series\": " (meta-list->json ((db:get-meta-list) 'series)) ", "
-             "\"Authors\": " (meta-list->json ((db:get-meta-list) 'authors)) ", "
-             "\"Tags\": " (meta-list->json ((db:get-meta-list) 'tags)) "}")))
+            "{\"categories\": " (meta-list->json ((db:get-meta-list) 'categories)) ", "
+             "\"series\": " (meta-list->json ((db:get-meta-list) 'series)) ", "
+             "\"authors\": " (meta-list->json ((db:get-meta-list) 'authors)) ", "
+             "\"tags\": " (meta-list->json ((db:get-meta-list) 'tags)) "}")))
     ((db:disconnect))
     (if out
       (display json out)
