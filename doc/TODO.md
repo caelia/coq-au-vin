@@ -22,3 +22,9 @@ TODO List for Coq au Vin
 * Implement SHOW & SORT for article lists.
 
 * Implement article aliases.
+
+* Support [RSS/Atom?] feeds.
+
+* Add user registration facility.
+
+* Email notifications.
