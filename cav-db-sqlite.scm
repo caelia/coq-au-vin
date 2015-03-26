@@ -21,7 +21,6 @@
         (use utf8)
         (use utf8-srfi-13)
         (use (prefix sql-de-lite sd:))
-        (use uri-common)
 
         (use cav-db)
 
@@ -1396,7 +1395,7 @@ SQL
                    `((id . ,u) (label . ,d)))))
              (lambda (x)
                (let ((val (cdar x)))
-                 `((id . ,(uri-encode-string val)) (label . ,val))))))
+                 `((id . ,val) (label . ,val))))))
          (conn (current-connection))
          (st (sd:sql/transient conn qstr))
          (raw-data (sd:query sd:fetch-alists st)))
